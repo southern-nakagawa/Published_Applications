@@ -143,7 +143,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
 
 
 #empty-state .big-icon { font-size: 128px; opacity: 0.4; }
-#empty-state p { color: var(--text2); opacity: 0.4; font-size: 14px; }
+#empty-state p { color: var(--text2); opacity: 0.7; font-size: 14px; text-align:center; white-space: pre-line; line-height:1.7; }
 
 /* 凡例 — 左下 */
 #legend { position: absolute; left: 12px; bottom: 12px; z-index: 1000; background: rgba(0,0,0,0.65); border-radius: 6px; padding: 8px 12px; font-size: 11px; color: rgba(255,255,255,0.7); backdrop-filter: blur(4px); }
@@ -216,9 +216,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       <h3>フライト一覧</h3>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px;">
         <!-- 場所プルダウン -->
-        <select id="filter-location" style="background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;width:100%;">
-          <option value="">📍 場所（すべて）</option>
-        </select>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <select id="filter-location" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;">
+            <option value="">📍 場所（すべて）</option>
+          </select>
+          <button id="btn-loc-mode" title="地名/座標 切り替え" style="flex-shrink:0;padding:4px 7px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;">🗺</button>
+        </div>
         <!-- 日付範囲 -->
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="filter-date-from" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:11px;outline:none;">
@@ -323,8 +326,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
   <!-- メインビュー -->
   <div id="view-area">
     <div id="empty-state">
-      <div class="big-icon">🛸</div>
-      <p>SRTファイルを読み込んでください</p>
+      <div class="big-icon" id="empty-icon">🛸</div>
+      <p id="empty-msg">SRTファイルを読み込んでください</p>
     </div>
     
     <!-- 3Dビュー -->
@@ -490,10 +493,10 @@ function recomputeAll() {
       leafletMarkers.forEach(m => leafletMap.removeLayer(m));
       leafletPolylines = []; leafletMarkers = [];
     }
-    document.getElementById('empty-state').style.display = 'flex';
     document.getElementById('stats-section').style.display = 'none';
     document.getElementById('waypoints-section').style.display = 'none';
     document.getElementById('legend').style.display = 'none';
+    setEmptyState(allFiles.length ? '☑️' : '🛸', allFiles.length ? '一覧でチェックしてください' : 'SRTファイルを読み込んでください');
     return;
   }
   refLat = files[0].frames[0].lat;
@@ -595,50 +598,115 @@ function addFiles(fileList) {
   });
 }
 
-function finalizeLoad() {
-  // 日付フィルターの自動設定（初回のみ）
-  const dates = allFiles.map(f => f._date).sort();
-  const fromEl = document.getElementById('filter-date-from');
-  const toEl   = document.getElementById('filter-date-to');
-  if (!fromEl.value) fromEl.value = dates[0];
-  if (!toEl.value)   toEl.value   = dates[dates.length-1];
+// ===== 場所ラベル管理 =====
+let locLabelMode = 'latlon'; // 'latlon' | 'name'
+let locNameCache = {};       // locKey -> 地名文字列
+let userLat = null, userLon = null;
 
-  // 場所プルダウンを再構築（重複なし・逆ジオコーダなしで緯度経度2桁ラベル）
+// 起動時に現在地を取得
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLon = pos.coords.longitude;
+    if (allFiles.length) finalizeLoad(); // 再ソート
+  }, () => {});
+}
+
+function geoDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+async function fetchLocName(key, lat, lon) {
+  if (locNameCache[key]) return locNameCache[key];
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
+    const data = await res.json();
+    const addr = data.address || {};
+    const name = addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || addr.county || addr.state || key;
+    locNameCache[key] = name;
+    return name;
+  } catch(e) { locNameCache[key] = key; return key; }
+}
+
+// locKeyの配列を現在地に近い順で返す
+function getSortedLocKeys() {
+  const keys = [...new Set(allFiles.map(f => f._locKey))];
+  if (userLat !== null) {
+    keys.sort((a, b) => {
+      const [aLat, aLon] = a.split(',').map(Number);
+      const [bLat, bLon] = b.split(',').map(Number);
+      return geoDistance(userLat, userLon, aLat, aLon) - geoDistance(userLat, userLon, bLat, bLon);
+    });
+  }
+  return keys;
+}
+
+async function buildLocationDropdown(selectKey) {
   const locSel = document.getElementById('filter-location');
-  const prevLoc = locSel.value;
-  // 緯度経度2桁でグルーピング → ユニーク
-  const locMap = {};
-  allFiles.forEach(f => {
-    const key = f._locKey; // "35.24,139.59" など
-    if (!locMap[key]) {
-      // 都道府県など逆引きはできないので「付近 lat,lon」ラベルにする
-      locMap[key] = `📍 ${key} 付近 (${allFiles.filter(x=>x._locKey===key).length}件)`;
+  const keys = getSortedLocKeys();
+
+  const labels = {};
+  for (const key of keys) {
+    const count = allFiles.filter(f => f._locKey === key).length;
+    const [lat, lon] = key.split(',').map(Number);
+    const distTxt = userLat !== null
+      ? ` (${(geoDistance(userLat, userLon, lat, lon)/1000).toFixed(1)}km)` : '';
+    if (locLabelMode === 'name') {
+      const name = await fetchLocName(key, lat, lon);
+      labels[key] = `📍 ${name}${distTxt} ${count}件`;
+    } else {
+      labels[key] = `📍 ${key}${distTxt} ${count}件`;
     }
-  });
-  locSel.innerHTML = '<option value="">📍 場所（すべて）</option>';
-  Object.entries(locMap).forEach(([key, label]) => {
+  }
+
+  // 「すべて」は選択肢として残すが末尾に
+  locSel.innerHTML = '';
+  keys.forEach(key => {
     const opt = document.createElement('option');
-    opt.value = key; opt.textContent = label;
+    opt.value = key; opt.textContent = labels[key];
     locSel.appendChild(opt);
   });
-  // 以前の選択を復元
-  if (prevLoc && locMap[prevLoc]) locSel.value = prevLoc;
+  const allOpt = document.createElement('option');
+  allOpt.value = ''; allOpt.textContent = '🌐 すべての場所';
+  locSel.appendChild(allOpt);
+
+  // 指定keyがあればそれを、なければ最近傍（先頭）を選択
+  if (selectKey !== undefined && [...locSel.options].some(o => o.value === selectKey)) {
+    locSel.value = selectKey;
+  } else if (keys.length > 0) {
+    locSel.value = keys[0]; // 現在地に最も近い場所をデフォルト選択
+  }
+}
+
+function finalizeLoad() {
+  // 日付フィルターを全期間にリセット（追加読み込みでは再計算）
+  const dates = allFiles.map(f => f._date).sort();
+  document.getElementById('filter-date-from').value = dates[0];
+  document.getElementById('filter-date-to').value   = dates[dates.length-1];
 
   document.getElementById('flight-list-section').style.display = 'block';
-  applyFilter();
+
+  // プルダウン構築後にフィルター適用（現在の選択を引き継ぐ）
+  const curLoc = document.getElementById('filter-location').value;
+  buildLocationDropdown(curLoc).then(() => applyFilter());
 }
 
 function applyFilter() {
-  const locVal  = document.getElementById('filter-location').value;
+  const locVal  = document.getElementById('filter-location').value; // '' = すべて
   const fromVal = document.getElementById('filter-date-from').value;
   const toVal   = document.getElementById('filter-date-to').value;
+
+  // 一覧に表示するファイル（フィルター条件に合うもの）
   let list = allFiles.filter(f => {
     if (locVal  && f._locKey !== locVal) return false;
     if (fromVal && f._date < fromVal) return false;
     if (toVal   && f._date > toVal)   return false;
     return true;
   });
-  // ソート
   list.sort((a, b) => {
     let av, bv;
     if (sortKey === 'date') { av = a._date; bv = b._date; }
@@ -649,6 +717,10 @@ function applyFilter() {
     return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
   });
   renderFlightTable(list);
+
+  // 表示ファイル = フィルター条件 AND checked
+  files = list.filter(f => f.visible);
+  syncDisplay(list);
 }
 
 function renderFlightTable(list) {
@@ -671,9 +743,14 @@ function renderFlightTable(list) {
           ↑ ${f._maxAlt.toFixed(0)}m &nbsp; 🛤 ${distStr} &nbsp; 📍 ${f._locKey}
         </div>
       </div>`;
-    div.querySelector('input').onchange = (e) => {
+    div.querySelector('input').onchange = e => {
       const target = allFiles.find(a => String(a.id) === e.target.dataset.id);
-      if (target) { target.visible = e.target.checked; updateCountLabel(list); syncFilesAndRedraw(); }
+      if (target) {
+        target.visible = e.target.checked;
+        files = list.filter(f => f.visible);
+        updateCountLabel(list);
+        syncDisplay(list);
+      }
     };
     tbody.appendChild(div);
   });
@@ -685,32 +762,40 @@ function updateCountLabel(list) {
     `${list.length} / ${allFiles.length} 件 (${list.filter(f=>f.visible).length}件表示中)`;
 }
 
-function syncFilesAndRedraw() {
-  // フィルター条件を取得して絞り込んだ上でvisible=trueのものだけ表示
-  const locVal  = document.getElementById('filter-location').value;
-  const fromVal = document.getElementById('filter-date-from').value;
-  const toVal   = document.getElementById('filter-date-to').value;
-  files = allFiles.filter(f => {
-    if (!f.visible) return false;
-    if (locVal  && f._locKey !== locVal) return false;
-    if (fromVal && f._date < fromVal) return false;
-    if (toVal   && f._date > toVal)   return false;
-    return true;
-  });
+// 表示/非表示を地図に反映し、必要なメッセージを出す
+function syncDisplay(filteredList) {
   if (!files.length) {
     allPts = [];
     if (animId3d) { cancelAnimationFrame(animId3d); animId3d = null; }
     if (renderer3d && camera3d) { const s=new THREE.Scene(); s.background=new THREE.Color(0x0a0a1a); renderer3d.render(s,camera3d); }
     scene3d = null;
     if (leafletMap) { leafletPolylines.forEach(l=>leafletMap.removeLayer(l)); leafletMarkers.forEach(m=>leafletMap.removeLayer(m)); leafletPolylines=[]; leafletMarkers=[]; }
-    document.getElementById('empty-state').style.display = 'flex';
     document.getElementById('stats-section').style.display = 'none';
     document.getElementById('waypoints-section').style.display = 'none';
     document.getElementById('legend').style.display = 'none';
+    // メッセージ判定
+    if (allFiles.length === 0) {
+      setEmptyState('🛸', 'SRTファイルを読み込んでください');
+    } else if (filteredList.length === 0) {
+      setEmptyState('🔍', 'フィルター条件に一致する\nフライトがありません');
+    } else {
+      setEmptyState('☑️', '一覧でチェックしてください');
+    }
     return;
   }
+  document.getElementById('empty-state').style.display = 'none';
   recomputeAll();
 }
+
+function setEmptyState(icon, msg) {
+  document.getElementById('empty-icon').textContent = icon;
+  document.getElementById('empty-msg').textContent = msg;
+  document.getElementById('empty-state').style.display = 'flex';
+}
+
+function showNoDataMessage(reason) { setEmptyState('🚫', reason); } // 後方互換
+
+function syncFilesAndRedraw() { applyFilter(); } // 後方互換
 
 function renderFileList() {
   // 互換性のため残す（waypointsなどが使う）
@@ -1511,11 +1596,20 @@ dz.onclick = (e) => { if (e.target === dz || e.target.tagName === 'DIV' || e.tar
 document.getElementById('filter-location').onchange = applyFilter;
 document.getElementById('filter-date-from').onchange = applyFilter;
 document.getElementById('filter-date-to').onchange = applyFilter;
+
+// 地名/緯度経度 切り替えボタン
+document.getElementById('btn-loc-mode').onclick = () => {
+  locLabelMode = locLabelMode === 'latlon' ? 'name' : 'latlon';
+  document.getElementById('btn-loc-mode').textContent = locLabelMode === 'name' ? '🔢' : '🗺';
+  document.getElementById('btn-loc-mode').title = locLabelMode === 'name' ? '緯度経度表示に切り替え' : '地名表示に切り替え';
+  buildLocationDropdown();
+};
+
 document.getElementById('btn-check-all').onclick = () => {
-  allFiles.forEach(f => f.visible = true); applyFilter(); syncFilesAndRedraw();
+  allFiles.forEach(f => f.visible = true); applyFilter();
 };
 document.getElementById('btn-uncheck-all').onclick = () => {
-  allFiles.forEach(f => f.visible = false); applyFilter(); syncFilesAndRedraw();
+  allFiles.forEach(f => f.visible = false); applyFilter();
 };
 document.getElementById('btn-filter-clear').onclick = () => {
   document.getElementById('filter-location').value = '';
