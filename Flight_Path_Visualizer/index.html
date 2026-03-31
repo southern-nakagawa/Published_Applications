@@ -565,6 +565,9 @@ function updateWaypoints() {
 }
 
 function updateLegend() {
+  const mode = document.querySelector('input[name="colorMode"]:checked').value;
+  document.getElementById('legend').style.display = mode === 'file' ? 'none' : 'block';
+  if (mode === 'file') return;
   const cv = document.getElementById('legend-canvas');
   const ctx = cv.getContext('2d');
   const low = hexToRgb(document.getElementById('colorLow').value);
