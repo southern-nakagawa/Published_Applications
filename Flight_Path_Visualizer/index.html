@@ -1312,7 +1312,7 @@ window.addEventListener('mousemove', e => {
     const speed = sph.r * 0.002;
     const right = new THREE.Vector3(-Math.cos(sph.theta), 0, Math.sin(sph.theta));
     target3d.addScaledVector(right, dx * speed);
-    target3d.y -= dy * speed;
+    target3d.y += dy * speed;
   } else {
     sph.theta -= dx * 0.007;
     sph.phi = Math.max(0.05, Math.min(Math.PI/2 - 0.02, sph.phi - dy * 0.007));
