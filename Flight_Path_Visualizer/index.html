@@ -659,8 +659,10 @@ function getSortedLocKeys() {
   return keys;
 }
 
-async function buildLocationDropdown(selectKey) {
+async function buildLocationDropdown(selectKey, labelOnly = false) {
   const locSel = document.getElementById('filter-location');
+  // labelOnly=true のときは現在の選択値を保持してラベルだけ書き換える
+  const prevKey = labelOnly ? locSel.value : undefined;
   const keys = getSortedLocKeys();
 
   const labels = {};
@@ -677,7 +679,6 @@ async function buildLocationDropdown(selectKey) {
     }
   }
 
-  // 「すべて」は選択肢として残すが末尾に
   locSel.innerHTML = '';
   keys.forEach(key => {
     const opt = document.createElement('option');
@@ -688,8 +689,11 @@ async function buildLocationDropdown(selectKey) {
   allOpt.value = ''; allOpt.textContent = '🌐 すべての場所';
   locSel.appendChild(allOpt);
 
-  // 指定keyがあればそれを、なければ最近傍（先頭）を選択
-  if (selectKey !== undefined && [...locSel.options].some(o => o.value === selectKey)) {
+  if (labelOnly) {
+    // ラベル切り替えのみ：選択値を復元するだけでフィルターは変えない
+    locSel.value = (prevKey !== undefined && [...locSel.options].some(o => o.value === prevKey))
+      ? prevKey : (keys.length > 0 ? keys[0] : '');
+  } else if (selectKey !== undefined && [...locSel.options].some(o => o.value === selectKey)) {
     locSel.value = selectKey;
   } else if (keys.length > 0) {
     locSel.value = keys[0]; // 現在地に最も近い場所をデフォルト選択
@@ -704,9 +708,10 @@ function finalizeLoad() {
 
   document.getElementById('flight-list-section').style.display = 'block';
 
-  // プルダウン構築後にフィルター適用（現在の選択を引き継ぐ）
+  // 初回(curLoc='')は最近傍キーを渡す。追加読み込み時は現在の選択を引き継ぐ
   const curLoc = document.getElementById('filter-location').value;
-  buildLocationDropdown(curLoc).then(() => applyFilter());
+  const nearestKey = getSortedLocKeys()[0];
+  buildLocationDropdown(curLoc || nearestKey).then(() => applyFilter());
 }
 
 function applyFilter() {
@@ -1643,7 +1648,7 @@ document.getElementById('btn-loc-mode').onclick = () => {
   locLabelMode = locLabelMode === 'latlon' ? 'name' : 'latlon';
   document.getElementById('btn-loc-mode').textContent = locLabelMode === 'name' ? '🔢' : '🗺';
   document.getElementById('btn-loc-mode').title = locLabelMode === 'name' ? '緯度経度表示に切り替え' : '地名表示に切り替え';
-  buildLocationDropdown();
+  buildLocationDropdown(undefined, true); // ラベルだけ更新、選択・フィルターは変えない
 };
 
 document.getElementById('btn-check-all').onclick = () => {
