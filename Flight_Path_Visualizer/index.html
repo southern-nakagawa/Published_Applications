@@ -208,6 +208,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
         <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-files">📄 ファイル</button>
         <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-folder">📁 フォルダ</button>
       </div>
+      <!-- フォルダパス表示 -->
+      <div id="folder-path-box" style="display:none;margin-top:8px;padding:5px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">読み込みフォルダ</div>
+        <div id="folder-path-text" style="font-size:11px;color:var(--accent2);word-break:break-all;"></div>
+      </div>
       <div id="error-msg"></div>
     </div>
 
@@ -626,9 +631,18 @@ async function fetchLocName(key, lat, lon) {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
     const data = await res.json();
     const addr = data.address || {};
-    const name = addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || addr.county || addr.state || key;
-    locNameCache[key] = name;
-    return name;
+    // 市区町村を優先：city_district（区）> city（市）> town（町）> village（村）> county > state
+    const name = addr.city_district || addr.suburb ||
+                 (addr.city ? addr.city + (addr.city_district ? '' : '') : null) ||
+                 addr.town || addr.village || addr.county || addr.state || key;
+    // 「市 + 区」の形で表示（例：横浜市 港北区）
+    const full = addr.city && addr.city_district
+      ? `${addr.city} ${addr.city_district}`
+      : addr.city && addr.suburb
+      ? `${addr.city} ${addr.suburb}`
+      : name;
+    locNameCache[key] = full;
+    return full;
   } catch(e) { locNameCache[key] = key; return key; }
 }
 
@@ -1557,16 +1571,20 @@ document.getElementById('btn-reset-view').onclick = () => {
 };
 
 document.getElementById('btn-clear-all').onclick = () => {
-  files = []; allPts = [];
+  allFiles = []; files = []; allPts = [];
   mapTexture = null; mapTextureBounds = null;
+  locNameCache = {};
   renderFileList();
+  document.getElementById('folder-path-box').style.display = 'none';
+  document.getElementById('folder-path-text').textContent = '';
+  document.getElementById('flight-list-section').style.display = 'none';
+  document.getElementById('empty-icon').textContent = '🛸';
+  document.getElementById('empty-msg').textContent = 'SRTファイルを読み込んでください';
   document.getElementById('empty-state').style.display = 'flex';
   document.getElementById('stats-section').style.display = 'none';
   document.getElementById('waypoints-section').style.display = 'none';
   document.getElementById('legend').style.display = 'none';
-  // アニメーション停止
   if (animId3d) { cancelAnimationFrame(animId3d); animId3d = null; }
-  // 空シーンで1フレーム描画して画面をクリア
   if (renderer3d && camera3d) {
     const emptyScene = new THREE.Scene();
     emptyScene.background = new THREE.Color(0x0a0a1a);
@@ -1585,9 +1603,32 @@ document.getElementById('btn-clear-all').onclick = () => {
 const dz = document.getElementById('drop-zone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); addFiles(e.dataTransfer.files); });
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  const items = e.dataTransfer.items;
+  // フォルダ名をできる限り表示
+  if (items && items.length > 0) {
+    const entry = items[0].webkitGetAsEntry ? items[0].webkitGetAsEntry() : null;
+    if (entry && entry.isDirectory) {
+      document.getElementById('folder-path-text').textContent = `📁 ${entry.name}`;
+      document.getElementById('folder-path-box').style.display = 'block';
+    }
+  }
+  addFiles(e.dataTransfer.files);
+});
 document.getElementById('fi').addEventListener('change', e => { addFiles(e.target.files); e.target.value=''; });
-document.getElementById('fi-folder').addEventListener('change', e => { addFiles(e.target.files); e.target.value=''; });
+document.getElementById('fi-folder').addEventListener('change', e => {
+  const files = e.target.files;
+  if (files.length > 0) {
+    // webkitRelativePathからフォルダパスを取得（例: "DCIM/DJI_001.SRT" → "DCIM"）
+    const firstPath = files[0].webkitRelativePath || files[0].name;
+    const folderName = firstPath.includes('/') ? firstPath.split('/')[0] : '(選択フォルダ)';
+    document.getElementById('folder-path-text').textContent = `📁 ${folderName}`;
+    document.getElementById('folder-path-box').style.display = 'block';
+  }
+  addFiles(files);
+  e.target.value='';
+});
 document.getElementById('btn-pick-files').onclick = () => document.getElementById('fi').click();
 document.getElementById('btn-pick-folder').onclick = () => document.getElementById('fi-folder').click();
 dz.onclick = (e) => { if (e.target === dz || e.target.tagName === 'DIV' || e.target.tagName === 'P' || e.target.tagName === 'STRONG') document.getElementById('fi').click(); };
