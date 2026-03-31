@@ -1,1 +1,1750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Path Visualizer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500&display=swap');
 
+:root {
+  --bg: #0b0f1a;
+  --panel: #111827;
+  --panel2: #1a2235;
+  --border: rgba(100,160,255,0.15);
+  --accent: #3b82f6;
+  --accent2: #22d3ee;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; font-size: 14px; min-height: 100vh; }
+
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+#header h1 { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 2px; color: var(--accent2); }
+
+#main { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 49px); }
+
+#sidebar {
+  background: var(--panel); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+}
+.side-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.side-section h3 { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+
+#drop-zone {
+  border: 1.5px dashed rgba(100,160,255,0.3); border-radius: 8px;
+  padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s;
+  background: rgba(59,130,246,0.04);
+}
+#drop-zone:hover, #drop-zone.over { border-color: var(--accent); background: rgba(59,130,246,0.1); }
+#drop-zone .icon { font-size: 24px; margin-bottom: 6px; }
+#drop-zone p { color: var(--text2); font-size: 12px; margin-top: 4px; }
+#drop-zone strong { color: var(--text); font-size: 13px; }
+
+#file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.file-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: var(--panel2); border-radius: 6px; border: 1px solid var(--border);
+}
+.file-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.file-name { flex: 1; font-size: 11px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-pts { font-size: 10px; color: var(--text2); opacity: 0.7; }
+.file-del { cursor: pointer; color: var(--text2); font-size: 14px; opacity: 0.5; flex-shrink: 0; }
+.file-del:hover { opacity: 1; color: var(--red); }
+
+#stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-card { background: var(--panel2); border-radius: 6px; padding: 8px 10px; border: 1px solid var(--border); }
+.stat-label { font-size: 10px; color: var(--text2); margin-bottom: 3px; letter-spacing: 0.5px; }
+.stat-value { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 600; color: var(--accent2); }
+.stat-unit { font-size: 11px; color: var(--text2); }
+
+.ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ctrl-label { font-size: 12px; color: var(--text2); width: 70px; flex-shrink: 0; }
+.ctrl-row input[type=range] { flex: 1; accent-color: var(--accent); height: 4px; }
+.ctrl-val { font-size: 12px; color: var(--accent2); width: 36px; text-align: right; font-family: 'Rajdhani', sans-serif; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s; border: 1px solid; font-family: inherit; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--text2); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.map-tabs { display: flex; gap: 4px; }
+.map-tab { flex: 1; padding: 5px; text-align: center; font-size: 11px; border-radius: 4px; cursor: pointer; background: var(--panel2); border: 1px solid var(--border); color: var(--text2); transition: all 0.15s; }
+.map-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+.color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.color-row label { font-size: 12px; color: var(--text2); flex: 1; }
+.color-row input[type=color] { width: 32px; height: 22px; border: none; border-radius: 3px; cursor: pointer; background: none; padding: 0; }
+
+#view-area { position: relative; overflow: hidden; background: #0a0a1a; }
+#view-3d { position: absolute; inset: 0; }
+#three-canvas { display: block; width: 100%; height: 100%; }
+#view-map { position: absolute; inset: 0; display: none; }
+#leaflet-map { width: 100%; height: 100%; }
+
+/* オフスクリーン地図（3D用テクスチャ生成） */
+#offscreen-map-container {
+  position: fixed; left: -9999px; top: 0;
+  width: 1024px; height: 1024px;
+  pointer-events: none; visibility: hidden;
+}
+#offscreen-leaflet { width: 100%; height: 100%; }
+
+#view-toggle {
+  position: absolute; top: 12px; left: 12px; z-index: 1000;
+  display: flex; gap: 4px;
+}
+.vtab { padding: 6px 12px; font-size: 12px; border-radius: 4px; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: 1px; transition: all 0.15s; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.6); color: white; backdrop-filter: blur(4px); }
+.vtab.active { background: var(--accent); border-color: var(--accent); }
+
+/* ズームボタン — 右上 */
+#zoom-ctrl {
+  position: absolute; right: 12px; top: 12px; z-index: 1000;
+  display: flex; flex-direction: column; gap: 4px;
+}
+#zoom-ctrl button { width: 32px; height: 32px; background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 20px; line-height: 1; cursor: pointer; backdrop-filter: blur(4px); }
+#zoom-ctrl button:hover { background: rgba(59,130,246,0.5); }
+
+/* コンパス */
+#compass {
+  position: absolute; right: 52px; top: 12px; z-index: 1000;
+  width: 72px; height: 72px;
+  background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 40%; backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+#compass svg { width: 72px; height: 72px; }
+
+/* 3Dヒント */
+#hint3d { position: absolute; right: 12px; bottom: 12px; z-index: 100; font-size: 11px; color: rgba(255,255,255,0.35); text-align: right; line-height: 1.8; pointer-events: none; }
+
+/* 空ステート */
+#empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; } justify-content: center; gap: 12px; pointer-events: none; }
+
+/* 変更後 */
+#empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; }
+
+
+#empty-state .big-icon { font-size: 128px; opacity: 0.4; }
+#empty-state p { color: var(--text2); opacity: 0.4; font-size: 14px; }
+
+/* 凡例 — 左下 */
+#legend { position: absolute; left: 12px; bottom: 12px; z-index: 1000; background: rgba(0,0,0,0.65); border-radius: 6px; padding: 8px 12px; font-size: 11px; color: rgba(255,255,255,0.7); backdrop-filter: blur(4px); }
+#legend canvas { display: block; width: 110px; height: 8px; border-radius: 4px; margin-top: 4px; }
+
+/* ホバーツールチップ */
+#tooltip3d {
+  position: absolute; z-index: 2000; pointer-events: none; display: none;
+  background: rgba(10,15,30,0.92); border: 1px solid rgba(100,160,255,0.35);
+  border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--text);
+  line-height: 1.7; backdrop-filter: blur(6px); white-space: nowrap;
+}
+#tooltip3d .tt-title { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600; color: var(--accent2); margin-bottom: 3px; }
+
+/* マーカーラベル */
+.leaflet-marker-label { font-size: 11px; font-weight: bold; }
+
+/* スクロールバー */
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* エラー */
+#error-msg { color: var(--red); font-size: 12px; padding: 6px 0; display: none; }
+
+@media (max-width: 768px) {
+  #main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #sidebar { max-height: 45vh; }
+  #view-area { min-height: 55vh; }
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1 style="font-family:'Rajdhani',sans-serif;font-size:20px;letter-spacing:1px;color:var(--text2);font-weight:400;">
+    Flight Path Visualizer
+  </h1>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;">
+      <input type="checkbox" id="pdf-hide-datetime"> 日時を非表示
+    </label>
+    <button class="btn btn-ghost btn-sm" id="btn-export-pdf" style="border-color:rgba(34,211,238,0.4);color:var(--accent2);">📄 PDF出力</button>
+    <button class="btn btn-ghost btn-sm" id="btn-clear-all">クリア</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+
+    <div class="side-section">
+      <h3>SRT ファイル読み込み</h3>
+      <div id="drop-zone">
+        <div class="icon">🛸</div>
+        <strong>ドロップ / ボタンで選択</strong>
+        <p>.SRT ファイル・フォルダ対応</p>
+        <input type="file" id="fi" accept=".srt,.SRT" multiple style="display:none">
+        <input type="file" id="fi-folder" webkitdirectory multiple style="display:none">
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-files">📄 ファイル</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-folder">📁 フォルダ</button>
+      </div>
+      <div id="error-msg"></div>
+    </div>
+
+    <!-- フライト一覧 -->
+    <div class="side-section" id="flight-list-section" style="display:none">
+      <h3>フライト一覧</h3>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px;">
+        <!-- 場所プルダウン -->
+        <select id="filter-location" style="background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;width:100%;">
+          <option value="">📍 場所（すべて）</option>
+        </select>
+        <!-- 日付範囲 -->
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="date" id="filter-date-from" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:11px;outline:none;">
+          <span style="color:var(--text2);font-size:11px;flex-shrink:0;">〜</span>
+          <input type="date" id="filter-date-to" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:11px;outline:none;">
+        </div>
+        <div style="display:flex;gap:5px;">
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px;" id="btn-check-all">全選択</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px;" id="btn-uncheck-all">全解除</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px;" id="btn-filter-clear">リセット</button>
+        </div>
+      </div>
+      <div id="flight-table-body" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+      <div id="flight-count" style="font-size:10px;color:var(--text2);margin-top:5px;text-align:right;"></div>
+    </div>
+
+    <div class="side-section" id="stats-section" style="display:none">
+      <h3>フライト統計</h3>
+      <div id="stats-grid">
+        <div class="stat-card"><div class="stat-label">飛行時間</div><div class="stat-value" id="s-dur">-</div></div>
+        <div class="stat-card"><div class="stat-label">最大高度</div><div class="stat-value" id="s-alt">- <span class="stat-unit">m</span></div></div>
+        <div class="stat-card"><div class="stat-label">総飛行距離</div><div class="stat-value" id="s-dist">-</div></div>
+        <div class="stat-card"><div class="stat-label">ポイント数</div><div class="stat-value" id="s-pts">-</div></div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <h3>地図レイヤー</h3>
+      <div class="map-tabs">
+        <div class="map-tab active" data-layer="osm">OpenStreetMap</div>
+        <div class="map-tab" data-layer="gsi">国土地理院</div>
+        <div class="map-tab" data-layer="gsi-photo">地理院写真</div>
+      </div>
+      <p style="font-size:11px;color:var(--text2);margin-top:8px;">※ 2D・3Dビュー両方で使用</p>
+    </div>
+
+    <div class="side-section">
+      <h3>表示設定</h3>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">経路カラーモード</div>
+        <div style="display:flex;gap:6px;">
+          <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;background:var(--panel2);border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:12px;">
+            <input type="radio" name="colorMode" value="altitude" checked> 高度グラデーション
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;background:var(--panel2);border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:12px;">
+            <input type="radio" name="colorMode" value="file"> ファイル別色
+          </label>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">高度倍率</span>
+        <input type="range" id="altScale" min="0.2" max="5" step="0.1" value="1.0">
+        <span class="ctrl-val" id="altScaleVal">1.0x</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">ズーム感度</span>
+        <input type="range" id="zoomSpeed" min="1" max="5" step="0.5" value="2">
+        <span class="ctrl-val" id="zoomSpeedVal">2</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">マーカー径</span>
+        <input type="range" id="markerSize" min="0.2" max="1.0" step="0.1" value="0.6">
+        <span class="ctrl-val" id="markerSizeVal">0.6x</span>
+      </div>
+      <!-- ポイントサイズ -->
+      <div class="ctrl-row">
+        <span class="ctrl-label">ポイント径</span>
+        <input type="range" id="pointSize" min="0.5" max="3.0" step="0.1" value="1.0">
+        <span class="ctrl-val" id="pointSizeVal">1.0x</span>
+      </div>
+      <!-- 影表示 -->
+      <div style="margin:10px 0;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+          <input type="checkbox" id="showShadow" checked>
+          <span>地表に影を表示</span>
+        </label>
+      </div>
+      <div class="color-row">
+        <label>低高度カラー</label>
+        <input type="color" id="colorLow" value="#1e40af">
+      </div>
+      <div class="color-row">
+        <label>高高度カラー</label>
+        <input type="color" id="colorHigh" value="#22d3ee">
+      </div>
+      <div class="color-row">
+        <label>グリッドカラー</label>
+        <input type="color" id="colorGrid" value="#1e3a5f">
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary btn-sm" id="btn-apply" style="width:100%">適用</button>
+      </div>
+    </div>
+
+    <div class="side-section" id="waypoints-section" style="display:none">
+      <h3>離着陸ポイント</h3>
+      <div id="waypoints-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+  </div>
+  
+  <!-- メインビュー -->
+  <div id="view-area">
+    <div id="empty-state">
+      <div class="big-icon">🛸</div>
+      <p>SRTファイルを読み込んでください</p>
+    </div>
+    
+    <!-- 3Dビュー -->
+    <div id="view-3d">
+      <canvas id="three-canvas"></canvas>
+    </div>
+    
+    <!-- 2D地図ビュー -->
+    <div id="view-map">
+      <div id="leaflet-map"></div>
+    </div>
+    <!-- ビュー切り替え -->
+    <div id="view-toggle">
+      <div class="vtab active" data-view="3d">3D</div>
+      <div class="vtab" data-view="2d">2D 地図</div>
+    </div>
+
+    <!-- コンパス -->
+    <div id="compass">
+      <svg id="compass-svg" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        <!-- 固定：中心の小円 -->
+        <circle cx="18" cy="18" r="2" fill="rgba(255,255,255,0.5)"/>
+        <!-- 回転するディスク（NS WE ラベル＋目盛り） -->
+        <g id="compass-disk" transform="rotate(0,18,18)">
+          <text x="18" y="5"    text-anchor="middle" fill="#ef4444"            font-size="6" font-family="Rajdhani,sans-serif" font-weight="700">N</text>
+          <text x="18" y="34.5" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="6" font-family="Rajdhani,sans-serif">S</text>
+          <text x="3"  y="19.5" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="6" font-family="Rajdhani,sans-serif">W</text>
+          <text x="33" y="19.5" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="6" font-family="Rajdhani,sans-serif">E</text>
+          <!-- 目盛り線（N/S/E/W） -->
+          <line x1="18" y1="7.5" x2="18" y2="10"  stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <line x1="18" y1="26" x2="18" y2="28.5" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+          <line x1="7.5" y1="18" x2="10" y2="18"  stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+          <line x1="26" y1="18" x2="28.5" y2="18" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+        </g>
+        <!-- 固定：北を指す三角マーク（画面上側に常に固定） -->
+        <polygon points="18,8 19.5,12 16.5,12" fill="rgba(255,255,255,0.25)"/>
+      </svg>
+    </div>
+    
+    <!-- ズームボタン（3D/2D共通、右上） -->
+    <div id="zoom-ctrl">
+      <button id="btn-zoom-in" title="拡大">+</button>
+      <button id="btn-zoom-out" title="縮小">−</button>
+    </div>
+    
+    <!-- ホバーツールチップ -->
+    <div id="tooltip3d"><div class="tt-title" id="tt-title"></div><div id="tt-body"></div></div>
+
+    <div id="hint3d">左ドラッグ: 回転 &nbsp;右ドラッグ: 移動<br>ホイール: ズーム</div>
+    <div id="map-credit" style="position:absolute;right:12px;bottom:12px;z-index:1000;font-size:10px;color:rgba(255,255,255,0.5);background:rgba(0,0,0,0.4);padding:3px 7px;border-radius:4px;pointer-events:none;"></div>
+    <div id="legend" style="display:none">
+      <span>高度カラー</span>
+      <canvas id="legend-canvas" width="100" height="8"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- オフスクリーン地図（3D用テクスチャ取得） -->
+<div id="offscreen-map-container">
+  <div id="offscreen-leaflet"></div>
+</div>
+
+<script>
+// ===== ユーティリティ =====
+const R = 6371000;
+const deg2rad = d => d * Math.PI / 180;
+function latLonToMeters(lat, lon, refLat, refLon) {
+  return {
+    x: deg2rad(lon - refLon) * Math.cos(deg2rad(refLat)) * R,
+    y: -deg2rad(lat - refLat) * R  // Z軸方向を反転（北が奥）
+  };
+}
+function haversine(a, b) {
+  const dLat = deg2rad(b.lat - a.lat), dLon = deg2rad(b.lon - a.lon);
+  const h = Math.sin(dLat/2)**2 + Math.cos(deg2rad(a.lat))*Math.cos(deg2rad(b.lat))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function fmtDist(m) { return m >= 1000 ? (m/1000).toFixed(2)+' km' : Math.round(m)+' m'; }
+
+function detectLandingEvents(frames) {
+  const events = [];
+  if (!frames.length) return events;
+  let tookOff = false;
+  for (let i = 0; i < frames.length; i++) {
+    if (!tookOff && frames[i].alt > 3) {
+      const idx = Math.max(0, i - 1);
+      events.push({ type: 'takeoff', frame: frames[idx] });
+      tookOff = true;
+    }
+    if (tookOff && i > 0 && frames[i].alt < 3 && frames[i-1].alt >= 3) {
+      const next = frames[Math.min(i+5, frames.length-1)];
+      const dist = haversine(frames[i], next);
+      const dt = (new Date(next.ts) - new Date(frames[i].ts)) / 1000 || 1;
+      const speed = dist / dt;
+      if (speed < 3) {
+        events.push({ type: 'landing', frame: frames[i] });
+        tookOff = false;
+      }
+    }
+  }
+  if (tookOff) events.push({ type: 'landing', frame: frames[frames.length-1] });
+  return events;
+}
+function fmtDur(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return h > 0 ? `${h}時間${m}分` : m > 0 ? `${m}分${s}秒` : `${s}秒`;
+}
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  return { r, g, b };
+}
+
+// ===== SRT パーサー =====
+function parseSRT(text) {
+  const frames = [];
+  const re = /(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\n\[iso[^\n]*\[latitude:\s*([-\d.]+)\]\s*\[longitude:\s*([-\d.]+)\]\s*\[rel_alt:\s*([\d.]+)/g;
+  const tcAll = [...text.matchAll(/(\d{2}:\d{2}:\d{2},\d{3}) -->/g)].map(m => m[1]);
+  let i = 0;
+  for (const m of text.matchAll(re)) {
+    const lat = parseFloat(m[2]), lon = parseFloat(m[3]);
+    if (lat === 0 && lon === 0) { i++; continue; }
+    frames.push({ ts: m[1], lat, lon, alt: parseFloat(m[4]), tc: tcAll[i]||'' });
+    i++;
+  }
+  return frames;
+}
+
+function sampleBySecond(frames) {
+  if (!frames.length) return [];
+  const result = [frames[0]];
+  let lastSec = Math.floor(new Date(frames[0].ts).getTime() / 1000);
+  for (let i = 1; i < frames.length - 1; i++) {
+    const sec = Math.floor(new Date(frames[i].ts).getTime() / 1000);
+    if (sec > lastSec) { result.push(frames[i]); lastSec = sec; }
+  }
+  result.push(frames[frames.length - 1]);
+  return result;
+}
+
+// ===== データ管理 =====
+const COLORS = ['#3b82f6','#22d3ee','#a78bfa','#34d399','#f59e0b','#f87171','#e879f9','#fb923c'];
+let allFiles = []; // 全読み込みファイル（チェック状態を保持）
+let files = [];    // 表示中ファイル（allFilesのうちvisible:true）
+let allPts = [];
+let refLat = 0, refLon = 0;
+let sortKey = 'date', sortAsc = false;
+
+// 変更後
+function recomputeAll() {
+  if (!files.length) {
+    allPts = [];
+    if (animId3d) { cancelAnimationFrame(animId3d); animId3d = null; }
+    if (renderer3d && camera3d) {
+      const emptyScene = new THREE.Scene();
+      emptyScene.background = new THREE.Color(0x0a0a1a);
+      renderer3d.render(emptyScene, camera3d);
+    }
+    scene3d = null;
+    if (leafletMap) {
+      leafletPolylines.forEach(l => leafletMap.removeLayer(l));
+      leafletMarkers.forEach(m => leafletMap.removeLayer(m));
+      leafletPolylines = []; leafletMarkers = [];
+    }
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('waypoints-section').style.display = 'none';
+    document.getElementById('legend').style.display = 'none';
+    return;
+  }
+  refLat = files[0].frames[0].lat;
+  refLon = files[0].frames[0].lon;
+  allPts = [];
+  files.forEach(f => {
+    f.frames.forEach(p => {
+      const m = latLonToMeters(p.lat, p.lon, refLat, refLon);
+      allPts.push({ ...p, mx: m.x, my: m.y, fileId: f.id, color: f.color });
+    });
+  });
+  allPts.sort((a, b) => a.ts.localeCompare(b.ts));
+  updateStats();
+  updateWaypoints();
+  // 3Dは地図テクスチャ取得後にレンダリング
+  buildMapTextureAndRender3D();
+  update2D();
+  updateLegend();
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('stats-section').style.display = 'block';
+  document.getElementById('waypoints-section').style.display = 'block';
+  document.getElementById('legend').style.display = 'block';
+}
+
+function updateStats() {
+  if (!allPts.length) return;
+  const maxAlt = Math.max(...allPts.map(p => p.alt));
+  let totalDist = 0;
+  for (let i = 1; i < allPts.length; i++) totalDist += haversine(allPts[i-1], allPts[i]);
+  const first = allPts[0], last = allPts[allPts.length-1];
+  const dur = (new Date(last.ts) - new Date(first.ts)) / 1000;
+  document.getElementById('s-dur').textContent = fmtDur(Math.round(dur));
+  document.getElementById('s-alt').innerHTML = maxAlt.toFixed(1) + ' <span class="stat-unit">m</span>';
+  document.getElementById('s-dist').textContent = fmtDist(totalDist);
+  document.getElementById('s-pts').textContent = allPts.length.toLocaleString();
+}
+
+function updateWaypoints() {
+  const el = document.getElementById('waypoints-list');
+  el.innerHTML = '';
+  files.forEach(f => {
+    if (!f.frames.length) return;
+    const dur = (new Date(f.frames[f.frames.length-1].ts) - new Date(f.frames[0].ts)) / 1000;
+    const events = f.events || [];
+    let evHtml = events.map(ev => {
+      const icon = ev.type === 'takeoff' ? '🟢' : '🔴';
+      const label = ev.type === 'takeoff' ? '離陸' : '着陸';
+      return `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
+        ${icon} <span style="color:var(--text2)">${label}</span>
+        <span style="color:var(--text);font-size:10px;">${ev.frame.lat.toFixed(5)}, ${ev.frame.lon.toFixed(5)} &nbsp; rel:${ev.frame.alt.toFixed(1)}m</span>
+      </div>`;
+    }).join('');
+    el.innerHTML += `
+      <div style="background:var(--panel2);border-radius:6px;padding:8px 10px;border-left:3px solid ${f.color};">
+        <div style="font-size:11px;font-weight:500;color:var(--text);margin-bottom:4px;">${document.getElementById('pdf-hide-datetime').checked ? f.name.replace(/\d{14}/, '**************') : f.name}</div>
+        <div style="font-size:10px;color:var(--text2);">
+          ⏱ ${fmtDur(Math.round(dur))} &nbsp; 最大 ${Math.max(...f.frames.map(p=>p.alt)).toFixed(1)}m
+          ${evHtml}
+        </div>
+      </div>`;
+  });
+}
+
+function updateLegend() {
+  const cv = document.getElementById('legend-canvas');
+  const ctx = cv.getContext('2d');
+  const low = hexToRgb(document.getElementById('colorLow').value);
+  const high = hexToRgb(document.getElementById('colorHigh').value);
+  const grad = ctx.createLinearGradient(0, 0, 100, 0);
+  grad.addColorStop(0, `rgb(${Math.round(low.r*255)},${Math.round(low.g*255)},${Math.round(low.b*255)})`);
+  grad.addColorStop(1, `rgb(${Math.round(high.r*255)},${Math.round(high.g*255)},${Math.round(high.b*255)})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 100, 8);
+}
+
+// ===== ファイル UI =====
+function addFiles(fileList) {
+  const srtFiles = Array.from(fileList).filter(f => /\.srt$/i.test(f.name));
+  if (!srtFiles.length) { showError('SRTファイルが見つかりません'); return; }
+  let pending = srtFiles.length;
+  srtFiles.forEach(file => {
+    if (allFiles.find(f => f.name === file.name)) { pending--; if (!pending) finalizeLoad(); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const frames = sampleBySecond(parseSRT(e.target.result));
+      if (!frames.length) { showError(`${file.name}: GPS座標なし`); pending--; if (!pending) finalizeLoad(); return; }
+      const id = Date.now() + Math.random();
+      const color = COLORS[allFiles.length % COLORS.length];
+      const events = detectLandingEvents(frames);
+      let dist = 0; for (let i = 1; i < frames.length; i++) dist += haversine(frames[i-1], frames[i]);
+      const dur = (new Date(frames[frames.length-1].ts) - new Date(frames[0].ts)) / 1000;
+      const maxAlt = Math.max(...frames.map(p => p.alt));
+      allFiles.push({ id, name: file.name, frames, color, events, visible: true,
+        _date: frames[0].ts.substring(0, 10), _dur: dur, _maxAlt: maxAlt, _dist: dist,
+        _locKey: frames[0].lat.toFixed(2) + ',' + frames[0].lon.toFixed(2) });
+      pending--; if (!pending) finalizeLoad();
+    };
+    reader.readAsText(file);
+  });
+}
+
+function finalizeLoad() {
+  // 日付フィルターの自動設定（初回のみ）
+  const dates = allFiles.map(f => f._date).sort();
+  const fromEl = document.getElementById('filter-date-from');
+  const toEl   = document.getElementById('filter-date-to');
+  if (!fromEl.value) fromEl.value = dates[0];
+  if (!toEl.value)   toEl.value   = dates[dates.length-1];
+
+  // 場所プルダウンを再構築（重複なし・逆ジオコーダなしで緯度経度2桁ラベル）
+  const locSel = document.getElementById('filter-location');
+  const prevLoc = locSel.value;
+  // 緯度経度2桁でグルーピング → ユニーク
+  const locMap = {};
+  allFiles.forEach(f => {
+    const key = f._locKey; // "35.24,139.59" など
+    if (!locMap[key]) {
+      // 都道府県など逆引きはできないので「付近 lat,lon」ラベルにする
+      locMap[key] = `📍 ${key} 付近 (${allFiles.filter(x=>x._locKey===key).length}件)`;
+    }
+  });
+  locSel.innerHTML = '<option value="">📍 場所（すべて）</option>';
+  Object.entries(locMap).forEach(([key, label]) => {
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = label;
+    locSel.appendChild(opt);
+  });
+  // 以前の選択を復元
+  if (prevLoc && locMap[prevLoc]) locSel.value = prevLoc;
+
+  document.getElementById('flight-list-section').style.display = 'block';
+  applyFilter();
+}
+
+function applyFilter() {
+  const locVal  = document.getElementById('filter-location').value;
+  const fromVal = document.getElementById('filter-date-from').value;
+  const toVal   = document.getElementById('filter-date-to').value;
+  let list = allFiles.filter(f => {
+    if (locVal  && f._locKey !== locVal) return false;
+    if (fromVal && f._date < fromVal) return false;
+    if (toVal   && f._date > toVal)   return false;
+    return true;
+  });
+  // ソート
+  list.sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'date') { av = a._date; bv = b._date; }
+    else if (sortKey === 'dur')  { av = a._dur;    bv = b._dur; }
+    else if (sortKey === 'alt')  { av = a._maxAlt; bv = b._maxAlt; }
+    else if (sortKey === 'dist') { av = a._dist;   bv = b._dist; }
+    else { av = a.name; bv = b.name; }
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+  renderFlightTable(list);
+}
+
+function renderFlightTable(list) {
+  const tbody = document.getElementById('flight-table-body');
+  const hideDT = document.getElementById('pdf-hide-datetime').checked;
+  tbody.innerHTML = '';
+  list.forEach(f => {
+    const maskedName = hideDT ? f.name.replace(/\d{14}/, '**...**') : f.name;
+    const shortName = maskedName.length > 22 ? maskedName.substring(0, 19) + '...' : maskedName;
+    const distStr = f._dist >= 1000 ? (f._dist/1000).toFixed(1)+'km' : Math.round(f._dist)+'m';
+    const div = document.createElement('div');
+    div.style.cssText = `display:flex;align-items:flex-start;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);`;
+    div.innerHTML = `
+      <input type="checkbox" data-id="${f.id}" ${f.visible ? 'checked' : ''} style="margin-top:3px;accent-color:var(--accent);flex-shrink:0;">
+      <div style="width:8px;height:8px;border-radius:50%;background:${f.color};flex-shrink:0;margin-top:4px;"></div>
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${maskedName}">${shortName}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px;">
+          📅 ${f._date} &nbsp;⏱ ${fmtDur(Math.round(f._dur))}<br>
+          ↑ ${f._maxAlt.toFixed(0)}m &nbsp; 🛤 ${distStr} &nbsp; 📍 ${f._locKey}
+        </div>
+      </div>`;
+    div.querySelector('input').onchange = (e) => {
+      const target = allFiles.find(a => String(a.id) === e.target.dataset.id);
+      if (target) { target.visible = e.target.checked; updateCountLabel(list); syncFilesAndRedraw(); }
+    };
+    tbody.appendChild(div);
+  });
+  updateCountLabel(list);
+}
+
+function updateCountLabel(list) {
+  document.getElementById('flight-count').textContent =
+    `${list.length} / ${allFiles.length} 件 (${list.filter(f=>f.visible).length}件表示中)`;
+}
+
+function syncFilesAndRedraw() {
+  // フィルター条件を取得して絞り込んだ上でvisible=trueのものだけ表示
+  const locVal  = document.getElementById('filter-location').value;
+  const fromVal = document.getElementById('filter-date-from').value;
+  const toVal   = document.getElementById('filter-date-to').value;
+  files = allFiles.filter(f => {
+    if (!f.visible) return false;
+    if (locVal  && f._locKey !== locVal) return false;
+    if (fromVal && f._date < fromVal) return false;
+    if (toVal   && f._date > toVal)   return false;
+    return true;
+  });
+  if (!files.length) {
+    allPts = [];
+    if (animId3d) { cancelAnimationFrame(animId3d); animId3d = null; }
+    if (renderer3d && camera3d) { const s=new THREE.Scene(); s.background=new THREE.Color(0x0a0a1a); renderer3d.render(s,camera3d); }
+    scene3d = null;
+    if (leafletMap) { leafletPolylines.forEach(l=>leafletMap.removeLayer(l)); leafletMarkers.forEach(m=>leafletMap.removeLayer(m)); leafletPolylines=[]; leafletMarkers=[]; }
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('waypoints-section').style.display = 'none';
+    document.getElementById('legend').style.display = 'none';
+    return;
+  }
+  recomputeAll();
+}
+
+function renderFileList() {
+  // 互換性のため残す（waypointsなどが使う）
+  // 新UIではflightTableが主役なので何もしない
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ===== オフスクリーン地図（3D テクスチャ用） =====
+let offscreenMap = null;
+let offscreenLayer = null;
+let mapTexture = null; // THREE.Texture
+let mapTextureBounds = null; // { minLat, maxLat, minLon, maxLon }
+
+const TILE_LAYERS = {
+  osm:       { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',          attr: '© OpenStreetMap contributors',       credit: '© OpenStreetMap contributors' },
+  gsi:       { url: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',    attr: '© 国土地理院',                        credit: '地理院タイルを加工して掲載（国土地理院）' },
+  'gsi-photo':{ url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', attr: '© 国土地理院',               credit: '地理院タイル（航空写真）を加工して掲載（国土地理院）' },
+};
+
+function initOffscreenMap() {
+  if (offscreenMap) return;
+  offscreenMap = L.map('offscreen-leaflet', {
+    zoomControl: false,
+    attributionControl: false,
+    fadeAnimation: false,
+    zoomAnimation: false,
+  });
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
+  offscreenLayer.addTo(offscreenMap);
+}
+
+function updateOffscreenLayer() {
+  if (!offscreenMap) return;
+  if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
+  offscreenLayer.addTo(offscreenMap);
+}
+
+/**
+ * オフスクリーン地図を対象範囲にフィットさせ、
+ * タイル読み込み完了後にcanvas2dで描画してThree.jsテクスチャ化する
+ */
+function buildMapTextureAndRender3D() {
+  if (!allPts.length) { render3D(); return; }
+
+  initOffscreenMap();
+
+  const lats = allPts.map(p => p.lat);
+  const lons = allPts.map(p => p.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+
+  // マージン25%（飛行スパンの1.5倍の地図範囲）
+  const latSpan = maxLat - minLat;
+  const lonSpan = maxLon - minLon;
+  const minMargin = 0.001;
+  const dLat = Math.max(latSpan * 0.25, minMargin);
+  const dLon = Math.max(lonSpan * 0.25, minMargin);
+
+  const bMinLat = minLat - dLat, bMaxLat = maxLat + dLat;
+  const bMinLon = minLon - dLon, bMaxLon = maxLon + dLon;
+
+  mapTextureBounds = {
+    minLat: bMinLat, maxLat: bMaxLat,
+    minLon: bMinLon, maxLon: bMaxLon
+  };
+
+  // コンテナは常に正方形1024x1024 — Leafletのfitは内部でアスペクト調整済み
+  // getBoundsで実際の表示範囲を取得するので、コンテナ形状は関係なし
+  const BASE = 1024;
+  const cW = BASE, cH = BASE;
+
+  const cont = document.getElementById('offscreen-map-container');
+  cont.style.width = cW + 'px';
+  cont.style.height = cH + 'px';
+  offscreenMap.invalidateSize({ animate: false });
+
+  const bounds = [[bMinLat, bMinLon], [bMaxLat, bMaxLon]];
+  offscreenMap.fitBounds(bounds);
+
+  let waited = 0;
+  const maxWait = 8000, interval = 300;
+  function tryCapture() {
+    waited += interval;
+    const tilesLoading = document.querySelectorAll('#offscreen-leaflet .leaflet-tile-pane img.leaflet-tile').length;
+    const tilesLoaded  = document.querySelectorAll('#offscreen-leaflet .leaflet-tile-pane img.leaflet-tile-loaded').length;
+    if ((tilesLoading > 0 && tilesLoaded >= tilesLoading) || waited >= maxWait) {
+      captureMapToTexture();
+      render3D();
+    } else { setTimeout(tryCapture, interval); }
+  }
+  setTimeout(tryCapture, 600);
+}
+
+function captureMapToTexture() {
+  // Leafletが実際に表示している地理範囲を正確に取得
+  if (offscreenMap) {
+    const actualBounds = offscreenMap.getBounds();
+    mapTextureBounds = {
+      minLat: actualBounds.getSouth(),
+      maxLat: actualBounds.getNorth(),
+      minLon: actualBounds.getWest(),
+      maxLon: actualBounds.getEast()
+    };
+  }
+
+  const container = document.getElementById('offscreen-leaflet');
+  const W = container.offsetWidth || 1024;
+  const H = container.offsetHeight || 1024;
+
+  // Canvasタイルの場合は直接取得; PNG/JPGタイルはimg要素からdrawImage
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = W;
+  offCanvas.height = H;
+  const ctx = offCanvas.getContext('2d');
+
+  // 背景
+  ctx.fillStyle = '#242424';
+  ctx.fillRect(0, 0, W, H);
+
+  // タイル画像を順に描画（位置はスタイルから取得）
+  const pane = container.querySelector('.leaflet-tile-pane');
+  if (pane) {
+    // 各transformコンテナを処理
+    const layers = pane.querySelectorAll('.leaflet-layer');
+    layers.forEach(layer => {
+      const layerTransform = getComputedTransform(layer);
+      const imgs = layer.querySelectorAll('img.leaflet-tile-loaded');
+      imgs.forEach(img => {
+        try {
+          const tileTransform = getComputedTransform(img.parentElement); // .leaflet-tile-container
+          const imgStyle = window.getComputedStyle(img);
+          const w = parseFloat(imgStyle.width) || 256;
+          const h = parseFloat(imgStyle.height) || 256;
+
+          // img要素の位置を親要素から取得
+          const rect = img.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const x = rect.left - containerRect.left;
+          const y = rect.top - containerRect.top;
+
+          ctx.drawImage(img, x, y, w, h);
+        } catch(e) { /* クロスオリジンのタイルはスキップ */ }
+      });
+    });
+  }
+
+  // Three.jsテクスチャ化
+  if (mapTexture) mapTexture.dispose();
+  mapTexture = new THREE.CanvasTexture(offCanvas);
+  mapTexture.needsUpdate = true;
+}
+
+function getComputedTransform(el) {
+  if (!el) return { x: 0, y: 0 };
+  const style = window.getComputedStyle(el);
+  const transform = style.transform;
+  if (!transform || transform === 'none') return { x: 0, y: 0 };
+  const mat = transform.match(/matrix\(([^)]+)\)/);
+  if (mat) {
+    const vals = mat[1].split(',').map(Number);
+    return { x: vals[4] || 0, y: vals[5] || 0 };
+  }
+  return { x: 0, y: 0 };
+}
+
+// ===== 3D レンダラー =====
+let renderer3d, scene3d, camera3d, animId3d;
+let isDrag = false, isRight = false, lastMouse = {x:0,y:0};
+let sph = { theta: 0, phi: Math.PI/6, r: 300 };
+let target3d = new THREE.Vector3();
+let defaultSph, defaultTarget3d;
+
+function getSettings() {
+  const cm = document.querySelector('input[name="colorMode"]:checked');
+  const zoomRaw = parseFloat(document.getElementById('zoomSpeed').value);
+  return {
+    altScale: parseFloat(document.getElementById('altScale').value),
+    zoomSpeed: zoomRaw / 100,
+    markerScale: parseFloat(document.getElementById('markerSize').value),
+    pointScale: parseFloat(document.getElementById('pointSize').value),
+    showShadow: document.getElementById('showShadow').checked,
+    colorMode: cm ? cm.value : 'altitude',
+    colorLow: hexToRgb(document.getElementById('colorLow').value),
+    colorHigh: hexToRgb(document.getElementById('colorHigh').value),
+    colorGrid: hexToRgb(document.getElementById('colorGrid').value),
+  };
+}
+    
+function saveSettings() {
+  const data = {
+    altScale: document.getElementById('altScale').value,
+    zoomSpeed: document.getElementById('zoomSpeed').value,
+    markerSize: document.getElementById('markerSize').value,
+    pointSize: document.getElementById('pointSize').value,
+    showShadow: document.getElementById('showShadow').checked,
+    colorMode: document.querySelector('input[name="colorMode"]:checked').value,
+    colorLow: document.getElementById('colorLow').value,
+    colorHigh: document.getElementById('colorHigh').value,
+    colorGrid: document.getElementById('colorGrid').value,
+  };
+  localStorage.setItem('fpv_settings', JSON.stringify(data));
+}
+
+function loadSettings() {
+  const raw = localStorage.getItem('fpv_settings');
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if (d.altScale)   { document.getElementById('altScale').value = d.altScale; document.getElementById('altScaleVal').textContent = d.altScale + 'x'; }
+    if (d.zoomSpeed)  { document.getElementById('zoomSpeed').value = d.zoomSpeed; document.getElementById('zoomSpeedVal').textContent = d.zoomSpeed; }
+    if (d.markerSize) { document.getElementById('markerSize').value = d.markerSize; document.getElementById('markerSizeVal').textContent = d.markerSize + 'x'; }
+    if (d.pointSize)  { document.getElementById('pointSize').value = d.pointSize; document.getElementById('pointSizeVal').textContent = d.pointSize + 'x'; }
+    if (d.showShadow !== undefined) document.getElementById('showShadow').checked = d.showShadow;
+    if (d.colorMode) { document.querySelector(`input[name="colorMode"][value="${d.colorMode}"]`).checked = true; }
+    if (d.colorLow)  document.getElementById('colorLow').value = d.colorLow;
+    if (d.colorHigh) document.getElementById('colorHigh').value = d.colorHigh;
+    if (d.colorGrid) document.getElementById('colorGrid').value = d.colorGrid;
+  } catch(e) {}
+}
+
+function render3D(resetView) {
+  if (!allPts.length) return;
+  const container = document.getElementById('view-3d');
+  const W = container.clientWidth || 800;
+  const H = container.clientHeight || 520;
+  const canvas = document.getElementById('three-canvas');
+  const s = getSettings();
+
+  if (!renderer3d) {
+    renderer3d = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer3d.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  }
+  renderer3d.setSize(W, H);
+
+  scene3d = new THREE.Scene();
+  scene3d.background = new THREE.Color(0x0a0a1a);
+  scene3d.fog = new THREE.FogExp2(0x0a0a1a, 0.0005);
+
+  if (!camera3d || camera3d.aspect !== W/H) {
+    camera3d = new THREE.PerspectiveCamera(50, W/H, 0.1, 50000);
+  }
+
+  scene3d.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dir = new THREE.DirectionalLight(0x88aaff, 0.8);
+  dir.position.set(100, 200, 100);
+  scene3d.add(dir);
+
+  const xs = allPts.map(p => p.mx), zs = allPts.map(p => p.my);
+  const cx = (Math.max(...xs)+Math.min(...xs))/2;
+  const cz = (Math.max(...zs)+Math.min(...zs))/2;
+  const maxX = Math.max(...xs), minX = Math.min(...xs);
+  const maxZ = Math.max(...zs), minZ = Math.min(...zs);
+  const spanX = maxX - minX, spanZ = maxZ - minZ;
+  const span = Math.max(spanX, spanZ, 200);  // 最小200m（ホバリング対応）
+  const maxAlt = Math.max(...allPts.map(p => p.alt)) * s.altScale;
+
+  target3d = new THREE.Vector3(cx, maxAlt * 0.3, cz);
+  if (resetView !== false) {
+    sph.r = Math.max(span * 1.3, 300);
+    sph.theta = 0;
+    sph.phi = Math.PI / 6;
+  }
+  defaultSph = { theta: 0, phi: Math.PI / 6, r: Math.max(span * 1.3, 300) };
+  defaultTarget3d = target3d.clone();
+  updateCamera3D();
+
+  // グリッド
+  const gc = s.colorGrid;
+  const gridColor1 = new THREE.Color(gc.r*1.5, gc.g*1.5, gc.b*1.5);
+  const gridColor2 = new THREE.Color(gc.r, gc.g, gc.b);
+  const gridSize = span * 2;  // span * 3 → 5 に拡大
+  const grid = new THREE.GridHelper(gridSize, 20, gridColor1, gridColor2);
+  grid.position.set(cx, 0.1, cz);
+  scene3d.add(grid);
+
+  // ===== 地面プレーン =====
+  if (mapTexture && mapTextureBounds) {
+    const tb = mapTextureBounds;
+    // テクスチャ境界をメートル座標に変換（latLonToMetersと同じ変換）
+    const mxL = deg2rad(tb.minLon - refLon) * Math.cos(deg2rad(refLat)) * R;
+    const mxR = deg2rad(tb.maxLon - refLon) * Math.cos(deg2rad(refLat)) * R;
+    const myT = -deg2rad(tb.maxLat - refLat) * R;  // 北 = 小さいmy
+    const myB = -deg2rad(tb.minLat - refLat) * R;  // 南 = 大きいmy
+    // プレーンをテクスチャ境界ぴったりで作成 → UV=0〜1で完全一致
+    const planeGeo = new THREE.PlaneGeometry(mxR - mxL, myB - myT);
+    const planeMat = new THREE.MeshBasicMaterial({ map: mapTexture });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set((mxL + mxR) / 2, -0.2, (myT + myB) / 2);
+    scene3d.add(plane);
+  } else {
+    const planeGeo = new THREE.PlaneGeometry(gridSize, gridSize);
+    const planeMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(gc.r*0.5, gc.g*0.5, gc.b*0.5), transparent: true, opacity: 0.5 });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(cx, -0.3, cz);
+    scene3d.add(plane);
+  }
+
+  // ===== 経路・ポイント描画 =====
+  const hoverSpheres = [];
+  files.forEach(f => {
+    const pts = allPts.filter(p => p.fileId === f.id);
+    if (pts.length < 2) return;
+    const useAltColor = s.colorMode === 'altitude';
+
+    // 経路ライン
+    const positions = [], colors = [];
+    pts.forEach(p => {
+      positions.push(p.mx, p.alt * s.altScale, p.my);
+      let c;
+      if (useAltColor) {
+        const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
+        c = new THREE.Color(
+          s.colorLow.r + (s.colorHigh.r - s.colorLow.r) * t,
+          s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
+          s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
+        );
+      } else {
+        c = new THREE.Color(f.color);
+      }
+      colors.push(c.r, c.g, c.b);
+    });
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    lineGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    scene3d.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 1 })));
+
+    // ポイント球のジオメトリを先に定義
+    const dotR = Math.max(0.3, span * 0.004) * s.pointScale;
+    const dotGeo = new THREE.SphereGeometry(dotR, 8, 8);
+
+    // 地面影（ON/OFF対応）
+    if (s.showShadow) {
+      const shadowPos = [], shadowColors = [];
+      pts.forEach(p => {
+        shadowPos.push(p.mx, 0.15, p.my);
+        const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
+        const sc = useAltColor ? new THREE.Color(
+          s.colorLow.r + (s.colorHigh.r - s.colorLow.r) * t,
+          s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
+          s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
+        ) : new THREE.Color(f.color);
+        shadowColors.push(sc.r, sc.g, sc.b);
+      });
+      const sGeo = new THREE.BufferGeometry();
+      sGeo.setAttribute('position', new THREE.Float32BufferAttribute(shadowPos, 3));
+      sGeo.setAttribute('color', new THREE.Float32BufferAttribute(shadowColors, 3));
+      scene3d.add(new THREE.Line(sGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.1 })));
+
+      // 影のポイント
+      const shadowDotGeo = new THREE.SphereGeometry(dotR, 8, 8);
+      pts.forEach(p => {
+        const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
+        const sc = useAltColor ? new THREE.Color(
+          s.colorLow.r + (s.colorHigh.r - s.colorLow.r) * t,
+          s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
+          s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
+        ) : new THREE.Color(f.color);
+        const shadowDot = new THREE.Mesh(
+          shadowDotGeo,
+          new THREE.MeshBasicMaterial({ color: sc, transparent: true, opacity: 0.2 })
+        );
+        shadowDot.position.set(p.mx, 0.15, p.my);
+        scene3d.add(shadowDot);
+      });
+    }
+
+    // 垂直線（間引き、影ON時のみ表示）
+    if (s.showShadow) {
+      const vstep = Math.max(1, Math.floor(pts.length / 40));
+      for (let i = 0; i < pts.length; i += vstep) {
+        const p = pts[i];
+        if (p.alt * s.altScale < 1) continue;
+        const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
+        const vc = useAltColor ? new THREE.Color(
+          s.colorLow.r + (s.colorHigh.r - s.colorLow.r) * t,
+          s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
+          s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
+        ) : new THREE.Color(f.color);
+        const vGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(p.mx, p.alt * s.altScale, p.my),
+          new THREE.Vector3(p.mx, 0, p.my)
+        ]);
+        scene3d.add(new THREE.Line(vGeo, new THREE.LineBasicMaterial({ color: vc, transparent: true, opacity: 0.2 })));
+      }
+    }
+    // ===== 1秒ごとのポイント球（可視化・ホバー対応） =====
+    pts.forEach(p => {
+      const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
+      let dotColor;
+      if (useAltColor) {
+        dotColor = new THREE.Color(
+          s.colorLow.r + (s.colorHigh.r - s.colorLow.r) * t,
+          s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
+          s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
+        );
+      } else { dotColor = new THREE.Color(f.color); }
+
+      // 可視のポイント球（opacity 0.75で表示）
+      const dot = new THREE.Mesh(dotGeo, new THREE.MeshLambertMaterial({
+        color: dotColor,
+        transparent: true,
+        opacity: 0.75,
+        emissive: dotColor,
+        emissiveIntensity: 0.15,
+      }));
+      dot.position.set(p.mx, p.alt * s.altScale, p.my);
+      dot.userData = { pt: p, fileName: f.name };
+      scene3d.add(dot);
+      hoverSpheres.push(dot);
+    });
+
+    // 離着陸マーカー
+    const baseMarker = span * 0.013 * s.markerScale;
+    const events = f.events || [
+      { type: 'takeoff', frame: pts[0] },
+      { type: 'landing', frame: pts[pts.length-1] }
+    ];
+    events.forEach(ev => {
+      const p = ev.frame;
+      const mp = allPts.find(ap => ap.lat === p.lat && ap.lon === p.lon) || pts[0];
+      const color = ev.type === 'takeoff' ? 0x22c55e : 0xef4444;
+      const sGeo = new THREE.SphereGeometry(baseMarker, 16, 16);
+      const sMat = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+      const sphere = new THREE.Mesh(sGeo, sMat);
+      sphere.position.set(mp.mx, mp.alt * s.altScale, mp.my);
+      scene3d.add(sphere);
+      const rGeo = new THREE.TorusGeometry(baseMarker * 1.8, baseMarker * 0.35, 8, 40);
+      const rMat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.8 });
+      const ring = new THREE.Mesh(rGeo, rMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(mp.mx, 0.4, mp.my);
+      scene3d.add(ring);
+      const vGeo2 = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(mp.mx, mp.alt * s.altScale, mp.my),
+        new THREE.Vector3(mp.mx, 0, mp.my)
+      ]);
+      scene3d.add(new THREE.Line(vGeo2, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 })));
+    });
+  });
+
+  if (animId3d) cancelAnimationFrame(animId3d);
+  animId3d = null;
+  scene3d.userData.hoverSpheres = hoverSpheres;
+  const loop = () => {
+    if (!scene3d || !camera3d) return;
+    animId3d = requestAnimationFrame(loop);
+    renderer3d.render(scene3d, camera3d);
+  };
+  loop();
+}
+
+function updateCamera3D() {
+  if (!camera3d) return;
+  const { theta, phi, r } = sph;
+  camera3d.position.set(
+    target3d.x + r * Math.sin(phi) * Math.sin(theta),
+    target3d.y + r * Math.cos(phi),
+    target3d.z + r * Math.sin(phi) * Math.cos(theta)
+  );
+  camera3d.lookAt(target3d);
+  // コンパス更新: theta=0が南から北向き → 回転
+  const disk = document.getElementById('compass-disk');
+  if (disk) disk.setAttribute('transform', `rotate(${theta * 180 / Math.PI},18,18)`);
+}
+
+// 3Dマウス操作
+const va = document.getElementById('view-area');
+va.addEventListener('mousedown', e => {
+  if (currentView !== '3d') return;
+  isDrag = true; isRight = e.button === 2;
+  lastMouse = { x: e.clientX, y: e.clientY };
+  e.preventDefault();
+});
+va.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mouseup', () => { isDrag = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDrag || currentView !== '3d') return;
+  const dx = e.clientX - lastMouse.x, dy = e.clientY - lastMouse.y;
+  lastMouse = { x: e.clientX, y: e.clientY };
+  if (isRight) {
+    const speed = sph.r * 0.002;
+    const right = new THREE.Vector3(-Math.cos(sph.theta), 0, Math.sin(sph.theta));
+    target3d.addScaledVector(right, dx * speed);
+    target3d.y -= dy * speed;
+  } else {
+    sph.theta -= dx * 0.007;
+    sph.phi = Math.max(0.05, Math.min(Math.PI/2 - 0.02, sph.phi - dy * 0.007));
+  }
+  updateCamera3D();
+});
+va.addEventListener('wheel', e => {
+  if (currentView !== '3d') return;
+  e.preventDefault();
+  const s = getSettings();
+  sph.r = Math.max(5, sph.r * (e.deltaY > 0 ? 1 + s.zoomSpeed : 1 - s.zoomSpeed));
+  updateCamera3D();
+}, { passive: false });
+
+// ズームボタン（3D/2D両対応）
+document.getElementById('btn-zoom-in').onclick = () => {
+  if (currentView === '3d') {
+    sph.r = Math.max(5, sph.r * 0.7);
+    updateCamera3D();
+  } else if (currentView === '2d' && leafletMap) {
+    leafletMap.zoomIn();
+  }
+};
+document.getElementById('btn-zoom-out').onclick = () => {
+  if (currentView === '3d') {
+    sph.r = sph.r * 1.4;
+    updateCamera3D();
+  } else if (currentView === '2d' && leafletMap) {
+    leafletMap.zoomOut();
+  }
+};
+
+// Raycaster（ホバーツールチップ）
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points = { threshold: 2 };
+let lastHovered = null;
+
+function fmtSpeed(a, b) {
+  if (!a || !b) return '-';
+  const dt = (new Date(b.ts) - new Date(a.ts)) / 1000;
+  if (dt <= 0) return '-';
+  const dist = haversine(a, b);
+  return (dist / dt).toFixed(1) + ' m/s';
+}
+
+va.addEventListener('mousemove', e => {
+  if (currentView !== '3d' || !renderer3d || !scene3d || !camera3d) return;
+  if (isDrag) { document.getElementById('tooltip3d').style.display = 'none'; return; }
+  const rect = va.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(new THREE.Vector2(mx, my), camera3d);
+  const spheres = scene3d.userData.hoverSpheres || [];
+  const hits = raycaster.intersectObjects(spheres);
+  const tt = document.getElementById('tooltip3d');
+  if (hits.length > 0) {
+    const obj = hits[0].object;
+    const { pt, fileName } = obj.userData;
+    const filePts = allPts.filter(p => p.fileId === pt.fileId);
+    const idx = filePts.findIndex(p => p.ts === pt.ts);
+    const prev = idx > 0 ? filePts[idx-1] : null;
+    const next = idx < filePts.length-1 ? filePts[idx+1] : null;
+    const speed = prev ? fmtSpeed(prev, pt) : next ? fmtSpeed(pt, next) : '-';
+    document.getElementById('tt-title').textContent = pt.ts.replace('T',' ').substring(0,19);
+    document.getElementById('tt-body').innerHTML =
+      `高度: <b>${pt.alt.toFixed(1)} m</b> &nbsp; 速度: <b>${speed}</b><br>` +
+      `緯度: ${pt.lat.toFixed(6)} &nbsp; 経度: ${pt.lon.toFixed(6)}<br>` +
+      `<span style="opacity:0.6;font-size:11px;">${fileName}</span>`;
+    tt.style.display = 'block';
+    let tx = e.clientX - rect.left + 14, ty = e.clientY - rect.top - 10;
+    if (tx + 240 > rect.width) tx = e.clientX - rect.left - 244;
+    tt.style.left = tx + 'px'; tt.style.top = ty + 'px';
+    if (lastHovered !== obj) { obj.scale.setScalar(2); if (lastHovered) lastHovered.scale.setScalar(1); lastHovered = obj; }
+  } else {
+    tt.style.display = 'none';
+    if (lastHovered) { lastHovered.scale.setScalar(1); lastHovered = null; }
+  }
+});
+
+let lastTouchDist = 0;
+va.addEventListener('touchstart', e => {
+  if (currentView !== '3d') return;
+  if (e.touches.length === 1) { isDrag = true; lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+  if (e.touches.length === 2) { lastTouchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); }
+}, { passive: true });
+va.addEventListener('touchmove', e => {
+  if (currentView !== '3d') return;
+  if (e.touches.length === 1 && isDrag) {
+    const dx = e.touches[0].clientX - lastMouse.x, dy = e.touches[0].clientY - lastMouse.y;
+    lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    sph.theta -= dx * 0.01; sph.phi = Math.max(0.05, Math.min(Math.PI/2-0.02, sph.phi - dy * 0.01));
+    updateCamera3D();
+  }
+  if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    sph.r = Math.max(5, sph.r * (lastTouchDist / d)); lastTouchDist = d; updateCamera3D();
+  }
+}, { passive: true });
+va.addEventListener('touchend', () => { isDrag = false; });
+
+// ===== 2D 地図 =====
+let leafletMap = null;
+let currentLayer = 'osm';
+let leafletLayerObj = null;
+let leafletPolylines = [];
+let leafletMarkers = [];
+
+function initLeaflet() {
+  if (leafletMap) return;
+  leafletMap = L.map('leaflet-map', { zoomControl: false, attributionControl: false });  // ズームコントロール無効化
+  switchTileLayer(currentLayer);
+}
+
+function switchTileLayer(key) {
+  if (leafletLayerObj) leafletMap.removeLayer(leafletLayerObj);
+  const tl = TILE_LAYERS[key];
+  leafletLayerObj = L.tileLayer(tl.url, {
+      attribution: tl.attr,
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
+  leafletLayerObj.addTo(leafletMap);
+  currentLayer = key;
+}
+
+function update2D() {
+  if (currentView !== '2d') return;
+  if (!leafletMap) initLeaflet();
+  leafletPolylines.forEach(l => leafletMap.removeLayer(l));
+  leafletMarkers.forEach(m => leafletMap.removeLayer(m));
+  leafletPolylines = []; leafletMarkers = [];
+  if (!allPts.length) return;
+
+  const s = getSettings();
+  const maxAlt2d = Math.max(...allPts.map(p => p.alt));
+
+  files.forEach(f => {
+    const pts = allPts.filter(p => p.fileId === f.id);
+    if (pts.length < 2) return;
+
+    if (s.colorMode === 'altitude') {
+      for (let i = 1; i < pts.length; i++) {
+        const t = maxAlt2d > 0 ? pts[i].alt / maxAlt2d : 0;
+        const lo = s.colorLow, hi = s.colorHigh;
+        const r = Math.round((lo.r + (hi.r - lo.r) * t) * 255);
+        const g = Math.round((lo.g + (hi.g - lo.g) * t) * 255);
+        const b = Math.round((lo.b + (hi.b - lo.b) * t) * 255);
+        const segColor = `rgb(${r},${g},${b})`;
+        const seg = L.polyline([[pts[i-1].lat, pts[i-1].lon],[pts[i].lat, pts[i].lon]], { color: segColor, weight: 3, opacity: 0.9 });
+        seg.addTo(leafletMap);
+        leafletPolylines.push(seg);
+      }
+    } else {
+      const poly = L.polyline(pts.map(p => [p.lat, p.lon]), { color: f.color, weight: 3, opacity: 0.85 });
+      poly.addTo(leafletMap);
+      leafletPolylines.push(poly);
+    }
+
+    const mkIcon = (color, label) => L.divIcon({
+      html: `<div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>
+        <div style="font-size:10px;font-weight:bold;color:${color};text-shadow:0 0 3px white;white-space:nowrap;">${label}</div>
+      </div>`,
+      iconSize: [14, 28], iconAnchor: [7, 7], className: ''
+    });
+    const events = f.events || [
+      { type: 'takeoff', frame: pts[0] },
+      { type: 'landing', frame: pts[pts.length-1] }
+    ];
+    events.forEach(ev => {
+      const color = ev.type === 'takeoff' ? '#22c55e' : '#ef4444';
+      const label = ev.type === 'takeoff' ? '離陸' : '着陸';
+      const m = L.marker([ev.frame.lat, ev.frame.lon], { icon: mkIcon(color, label) })
+        .bindTooltip(`${label}: ${f.name} (${ev.frame.alt.toFixed(1)}m)`);
+      m.addTo(leafletMap);
+      leafletMarkers.push(m);
+    });
+  });
+
+  const allLatLons = allPts.map(p => [p.lat, p.lon]);
+  if (allLatLons.length) leafletMap.fitBounds(L.latLngBounds(allLatLons), { padding: [40, 40] });
+}
+
+// ===== ビュー切り替え =====
+let currentView = '3d';
+document.querySelectorAll('.vtab').forEach(tab => {
+  tab.onclick = () => {
+    currentView = tab.dataset.view;
+    document.querySelectorAll('.vtab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-3d').style.display = currentView === '3d' ? 'block' : 'none';
+    document.getElementById('view-map').style.display = currentView === '2d' ? 'block' : 'none';
+    document.getElementById('hint3d').style.display = currentView === '3d' ? 'block' : 'none';
+    document.getElementById('tooltip3d').style.display = 'none';
+    if (currentView === '2d') {
+      if (!leafletMap) initLeaflet();
+      update2D();
+      setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 150);
+      // 2Dは常に北が上なのでコンパス針をリセット
+      const needle = document.getElementById('compass-needle');
+      if (needle) needle.setAttribute('transform', 'rotate(0,18,18)');
+    } else {
+      // 3Dに戻った時にリサイズ強制
+      setTimeout(() => {
+        if (renderer3d && camera3d) {
+          const el = document.getElementById('view-3d');
+          const W = el.clientWidth, H = el.clientHeight;
+          renderer3d.setSize(W, H);
+          camera3d.aspect = W / H;
+          camera3d.updateProjectionMatrix();
+        }
+      }, 50);
+    }
+  };
+});
+
+// 地図レイヤー切り替え
+document.querySelectorAll('.map-tab').forEach(tab => {
+    
+    tab.onclick = () => {
+      document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentLayer = tab.dataset.layer;
+      if (leafletMap) switchTileLayer(tab.dataset.layer);
+      const creditEl = document.getElementById('map-credit');
+      if (creditEl) creditEl.textContent = TILE_LAYERS[currentLayer].credit;
+    
+    // オフスクリーン地図も更新して3Dテクスチャを再生成
+    if (offscreenMap) {
+      updateOffscreenLayer();
+      if (allPts.length) {
+        mapTexture = null;
+        setTimeout(() => {
+          captureMapToTexture();
+          render3D();
+        }, 1500);
+      }
+    }
+    if (currentView === '2d') update2D();
+  };
+});
+
+// 設定適用
+document.getElementById('btn-apply').onclick = () => {
+  saveSettings();
+  if (allPts.length) { render3D(false); update2D(); updateLegend(); }
+};
+
+// スライダー表示更新
+document.getElementById('altScale').oninput = function() { document.getElementById('altScaleVal').textContent = this.value + 'x'; };
+document.getElementById('zoomSpeed').oninput = function() { document.getElementById('zoomSpeedVal').textContent = this.value; };
+document.getElementById('markerSize').oninput = function() { document.getElementById('markerSizeVal').textContent = this.value + 'x'; };
+document.getElementById('pointSize').oninput = function() { document.getElementById('pointSizeVal').textContent = this.value + 'x'; };
+
+// リセット
+document.getElementById('btn-reset-view').onclick = () => {
+  if (defaultSph) { sph = { ...defaultSph }; target3d = defaultTarget3d.clone(); updateCamera3D(); }
+  if (currentView === '2d' && leafletMap && allPts.length) {
+    leafletMap.fitBounds(L.latLngBounds(allPts.map(p => [p.lat, p.lon])), { padding: [40, 40] });
+  }
+};
+
+document.getElementById('btn-clear-all').onclick = () => {
+  files = []; allPts = [];
+  mapTexture = null; mapTextureBounds = null;
+  renderFileList();
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('stats-section').style.display = 'none';
+  document.getElementById('waypoints-section').style.display = 'none';
+  document.getElementById('legend').style.display = 'none';
+  // アニメーション停止
+  if (animId3d) { cancelAnimationFrame(animId3d); animId3d = null; }
+  // 空シーンで1フレーム描画して画面をクリア
+  if (renderer3d && camera3d) {
+    const emptyScene = new THREE.Scene();
+    emptyScene.background = new THREE.Color(0x0a0a1a);
+    renderer3d.render(emptyScene, camera3d);
+  }
+  scene3d = null;
+  camera3d = null;
+  if (leafletMap) {
+    leafletPolylines.forEach(l=>leafletMap.removeLayer(l));
+    leafletMarkers.forEach(m=>leafletMap.removeLayer(m));
+    leafletPolylines=[]; leafletMarkers=[];
+  }
+};
+
+// ドロップ & ボタン
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); addFiles(e.dataTransfer.files); });
+document.getElementById('fi').addEventListener('change', e => { addFiles(e.target.files); e.target.value=''; });
+document.getElementById('fi-folder').addEventListener('change', e => { addFiles(e.target.files); e.target.value=''; });
+document.getElementById('btn-pick-files').onclick = () => document.getElementById('fi').click();
+document.getElementById('btn-pick-folder').onclick = () => document.getElementById('fi-folder').click();
+dz.onclick = (e) => { if (e.target === dz || e.target.tagName === 'DIV' || e.target.tagName === 'P' || e.target.tagName === 'STRONG') document.getElementById('fi').click(); };
+
+// フィルター操作
+document.getElementById('filter-location').onchange = applyFilter;
+document.getElementById('filter-date-from').onchange = applyFilter;
+document.getElementById('filter-date-to').onchange = applyFilter;
+document.getElementById('btn-check-all').onclick = () => {
+  allFiles.forEach(f => f.visible = true); applyFilter(); syncFilesAndRedraw();
+};
+document.getElementById('btn-uncheck-all').onclick = () => {
+  allFiles.forEach(f => f.visible = false); applyFilter(); syncFilesAndRedraw();
+};
+document.getElementById('btn-filter-clear').onclick = () => {
+  document.getElementById('filter-location').value = '';
+  document.getElementById('filter-date-from').value = '';
+  document.getElementById('filter-date-to').value = '';
+  allFiles.forEach(f => f.visible = true); finalizeLoad();
+};
+
+
+// ===== PDF出力 =====
+document.getElementById('btn-export-pdf').onclick = async () => {
+  if (!allPts.length) { alert('フライトデータを読み込んでください'); return; }
+  const btn = document.getElementById('btn-export-pdf');
+  btn.textContent = '⏳ 生成中...'; btn.disabled = true;
+  try {
+    // 3D: WebGLレンダラーから直接取得
+    let imgDataUrl = null;
+    
+    if (currentView === '3d' && renderer3d && scene3d && camera3d) {
+      const origBg = scene3d.background;
+      const origFog = scene3d.fog;
+      scene3d.background = new THREE.Color(0xffffff);
+      scene3d.fog = null;
+      renderer3d.render(scene3d, camera3d);
+      scene3d.background = origBg;
+      scene3d.fog = origFog;
+
+      const overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = renderer3d.domElement.width;
+      overlayCanvas.height = renderer3d.domElement.height;
+      const oc = overlayCanvas.getContext('2d');
+
+      const baseImg = new Image();
+      baseImg.src = renderer3d.domElement.toDataURL('image/png');
+      await new Promise(res => { baseImg.onload = res; });
+      oc.drawImage(baseImg, 0, 0);
+
+      // コンパス（右上）
+      const cx = overlayCanvas.width - 70, cy = 70, cr = 50;
+      const angle = sph.theta;
+      oc.beginPath(); oc.arc(cx, cy, cr + 8, 0, Math.PI * 2);
+      oc.fillStyle = 'rgba(0,0,0,0.55)'; oc.fill();
+      oc.strokeStyle = 'rgba(255,255,255,0.2)'; oc.lineWidth = 1; oc.stroke();
+      oc.save(); oc.translate(cx, cy); oc.rotate(angle);
+      oc.font = `bold ${Math.round(6 * (cr/18) * 1.8)}px sans-serif`;
+      oc.textAlign = 'center'; oc.textBaseline = 'middle';
+      oc.fillStyle = '#ef4444'; oc.fillText('N', 0, -(cr - 8));
+      oc.fillStyle = 'rgba(255,255,255,0.6)'; oc.fillText('S', 0, cr - 8);
+      oc.fillStyle = 'rgba(255,255,255,0.5)'; oc.fillText('W', -(cr - 8), 0);
+      oc.fillText('E', cr - 8, 0);
+      oc.strokeStyle = 'rgba(255,255,255,0.4)'; oc.lineWidth = 1.5;
+      oc.beginPath(); oc.moveTo(0, -(cr-22)); oc.lineTo(0, -(cr-16)); oc.stroke();
+      oc.strokeStyle = 'rgba(255,255,255,0.25)'; oc.lineWidth = 1;
+      oc.beginPath(); oc.moveTo(0, cr-16); oc.lineTo(0, cr-22); oc.stroke();
+      oc.beginPath(); oc.moveTo(-(cr-16), 0); oc.lineTo(-(cr-22), 0); oc.stroke();
+      oc.beginPath(); oc.moveTo(cr-16, 0); oc.lineTo(cr-22, 0); oc.stroke();
+      oc.restore();
+      oc.save(); oc.translate(cx, cy);
+      oc.beginPath(); oc.moveTo(0, -(cr-2)); oc.lineTo(5, -(cr-12)); oc.lineTo(-5, -(cr-12)); oc.closePath();
+      oc.fillStyle = 'rgba(255,255,255,0.3)'; oc.fill();
+      oc.restore();
+      oc.beginPath(); oc.arc(cx, cy, 3, 0, Math.PI * 2);
+      oc.fillStyle = 'rgba(255,255,255,0.6)'; oc.fill();
+
+      // クレジット（左下）
+      const creditText3d = TILE_LAYERS[currentLayer].credit;
+      oc.font = '22px sans-serif';
+      oc.textAlign = 'left'; oc.textBaseline = 'bottom';
+      const tw3d = oc.measureText(creditText3d).width;
+      oc.fillStyle = 'rgba(0,0,0,0.45)';
+      oc.fillRect(6, overlayCanvas.height - 28, tw3d + 12, 24);
+      oc.fillStyle = 'rgba(255,255,255,0.85)';
+      oc.fillText(creditText3d, 12, overlayCanvas.height - 6);
+
+      imgDataUrl = overlayCanvas.toDataURL('image/png');
+        
+        
+    } else if (currentView === '2d' && leafletMap) {
+      const mapEl = document.getElementById('leaflet-map');
+      const W = mapEl.offsetWidth, H = mapEl.offsetHeight;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      const pane = mapEl.querySelector('.leaflet-tile-pane');
+      if (pane) {
+        const cr = mapEl.getBoundingClientRect();
+        pane.querySelectorAll('img.leaflet-tile-loaded').forEach(img => {
+          try { const r = img.getBoundingClientRect(); ctx.drawImage(img, r.left-cr.left, r.top-cr.top, r.width, r.height); } catch(e) {}
+        });
+      }
+      files.forEach(f => {
+        const pts = allPts.filter(p => p.fileId === f.id);
+        if (pts.length < 2) return;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 3; ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        pts.forEach((p, i) => { const px = leafletMap.latLngToContainerPoint([p.lat, p.lon]); i===0 ? ctx.moveTo(px.x,px.y) : ctx.lineTo(px.x,px.y); });
+        ctx.stroke();
+        (f.events||[]).forEach(ev => {
+          const px = leafletMap.latLngToContainerPoint([ev.frame.lat, ev.frame.lon]);
+          ctx.globalAlpha = 1; ctx.fillStyle = ev.type==='takeoff'?'#22c55e':'#ef4444';
+          ctx.beginPath(); ctx.arc(px.x, px.y, 7, 0, Math.PI*2); ctx.fill();
+        });
+      });
+      ctx.globalAlpha = 1;
+      const creditText2d = TILE_LAYERS[currentLayer].credit;
+      ctx.font = '22px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      const tw2d = ctx.measureText(creditText2d).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(6, H - 28, tw2d + 12, 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(creditText2d, 12, H - 6);
+      imgDataUrl = cv.toDataURL('image/png');
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const PW=297, PH=210, mg=10, leftW=88;
+    const rightX = mg + leftW + 6, rightW = PW - rightX - mg;
+
+    pdf.setFillColor(255,255,255); pdf.rect(0,0,PW,PH,'F');
+    pdf.setDrawColor(59,130,246); pdf.setLineWidth(0.3);
+    pdf.line(mg+leftW+3, mg, mg+leftW+3, PH-mg);
+
+    let y = mg+7;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(30,64,175);
+    pdf.text('FLIGHT REPORT', mg, y); y+=6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(100,116,139);
+    const now = new Date();
+    pdf.text(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'  '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'), mg, y); y+=6;
+    pdf.setDrawColor(59,130,246); pdf.setLineWidth(0.3); pdf.line(mg,y,mg+leftW,y); y+=6;
+
+    // --- フライト統計（HTMLサイドバーと同じ4項目） ---
+    const maxAltV = Math.max(...allPts.map(p=>p.alt));
+    let dist=0; for(let i=1;i<allPts.length;i++) dist+=haversine(allPts[i-1],allPts[i]);
+    const t0=allPts[0], t1=allPts[allPts.length-1];
+    const durS=(new Date(t1.ts)-new Date(t0.ts))/1000;
+    const phh=Math.floor(durS/3600),pmm=Math.floor((durS%3600)/60),pss=Math.floor(durS%60);
+    const durStr=phh>0?phh+'h'+pmm+'m':pmm>0?pmm+'m'+pss+'s':pss+'s';
+    const stats=[
+      ['Flight Duration', durStr],
+      ['Max Altitude', maxAltV.toFixed(1)+' m'],
+      ['Total Distance', dist>=1000?(dist/1000).toFixed(2)+' km':Math.round(dist)+' m'],
+      ['Data Points', allPts.length.toLocaleString()+' pt'],
+         ...(document.getElementById('pdf-hide-datetime').checked ? [] : [
+           ['Start', t0.ts.replace('T',' ').substring(0,19)],
+           ['End',   t1.ts.replace('T',' ').substring(0,19)],
+     ]),
+    ];
+    stats.forEach(([lbl,val])=>{
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(100,116,139); pdf.text(lbl,mg,y);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(15,23,42); pdf.text(val,mg,y+4.5); y+=11;
+    });
+    y+=2; pdf.setDrawColor(200,210,225); pdf.setLineWidth(0.2); pdf.line(mg,y,mg+leftW,y); y+=5;
+
+    // --- ファイル一覧 ---
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(30,64,175); pdf.text('SRT FILES',mg,y); y+=4;
+    files.forEach(f=>{
+      if(y>PH-mg-12) return;
+      const rgb=hexToRgb(f.color);
+      pdf.setFillColor(Math.round(rgb.r*255),Math.round(rgb.g*255),Math.round(rgb.b*255)); pdf.rect(mg,y-2.5,2.5,2.5,'F');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(15,23,42);
+      const displayName = document.getElementById('pdf-hide-datetime').checked
+        ? f.name.replace(/\d{14}/, '**************')
+        : f.name;
+      pdf.text((displayName.length>30?displayName.substring(0,27)+'...':displayName), mg+4, y);
+      const d2=(new Date(f.frames[f.frames.length-1].ts)-new Date(f.frames[0].ts))/1000;
+      const fm=Math.floor(d2/60),fs=Math.floor(d2%60);
+      const fDur=fm>0?fm+'m '+fs+'s ':fs+'s ';
+      pdf.setTextColor(100,116,139);
+      pdf.text(fDur+'  Max:'+Math.max(...f.frames.map(p=>p.alt)).toFixed(0)+'m  '+f.frames.length+'pt', mg+4, y+3.5); y+=9;
+    });
+
+    // --- 離着陸ポイント ---
+    if(y<PH-mg-28){
+      y+=2; pdf.setDrawColor(200,210,225); pdf.setLineWidth(0.2); pdf.line(mg,y,mg+leftW,y); y+=5;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(30,64,175); pdf.text('WAYPOINTS',mg,y); y+=4;
+      files.forEach(f=>{
+        (f.events||[]).forEach(ev=>{
+          if(y>PH-mg-6) return;
+          const isTakeoff=ev.type==='takeoff';
+          pdf.setFont('helvetica','normal'); pdf.setFontSize(7);
+          pdf.setTextColor(isTakeoff?22:185, isTakeoff?163:28, isTakeoff?74:28);
+          pdf.text(isTakeoff?'T/O':'LDG', mg, y);
+          pdf.setTextColor(60,80,110);
+          pdf.text(ev.frame.lat.toFixed(5)+', '+ev.frame.lon.toFixed(5)+', '+ev.frame.alt.toFixed(1)+'m ', mg+14, y); y+=4.5;
+        });
+      });
+    }
+
+    if(imgDataUrl){
+      const props=pdf.getImageProperties(imgDataUrl);
+      const asp=props.height/props.width;
+      const dH=Math.min(rightW*asp, PH-mg*2), dW=dH/asp;
+      const dX=rightX+(rightW-dW)/2, dY=mg+(PH-mg*2-dH)/2;
+      // 地図エリアの余白を白で塗りつぶし
+      pdf.setFillColor(255,255,255);
+      pdf.rect(rightX, mg, rightW, PH-mg*2, 'F');
+      pdf.setDrawColor(150,180,220); pdf.setLineWidth(0.4); pdf.rect(dX-0.5,dY-0.5,dW+1,dH+1);
+      pdf.addImage(imgDataUrl,'PNG',dX,dY,dW,dH);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
+      pdf.text(currentView==='3d'?'3D View':'2D Map', dX, dY+dH+4);
+    }
+    const saveName = document.getElementById('pdf-hide-datetime').checked
+      ? files[0].name.replace(/\d{14}/, '**************').replace(/\.srt$/i,'')
+      : (files.length>0?files[0].name.replace(/\.srt$/i,''):'flight');
+    pdf.save(saveName+'_report.pdf');
+  } catch(e) {
+    console.error(e); alert('PDF error: '+e.message);
+  } finally {
+    btn.textContent='📄 PDF出力'; btn.disabled=false;
+  }
+};
+
+// リサイズ対応
+window.addEventListener('resize', () => {
+  if (renderer3d && camera3d) {
+    const W = document.getElementById('view-3d').clientWidth;
+    const H = document.getElementById('view-3d').clientHeight;
+    renderer3d.setSize(W, H);
+    camera3d.aspect = W / H;
+    camera3d.updateProjectionMatrix();
+  }
+  if (leafletMap) leafletMap.invalidateSize();
+});
+document.getElementById('map-credit').textContent = TILE_LAYERS[currentLayer].credit;
+document.getElementById('pdf-hide-datetime').onchange = () => { renderFileList(); updateWaypoints(); };
+loadSettings();
+</script>
+</body>
+</html>
