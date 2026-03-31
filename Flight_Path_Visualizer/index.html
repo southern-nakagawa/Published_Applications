@@ -227,7 +227,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
           </select>
           <button id="btn-loc-mode" title="地名/座標 切り替え" style="flex-shrink:0;padding:4px 7px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;">🗺</button>
         </div>
-        <!-- 日付範囲 -->
+        <!-- 日付範囲・一覧（日時非表示時は隠す） -->
+        <div id="filter-detail">
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="filter-date-from" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:11px;outline:none;">
           <span style="color:var(--text2);font-size:11px;flex-shrink:0;">〜</span>
@@ -241,6 +242,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       </div>
       <div id="flight-table-body" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
       <div id="flight-count" style="font-size:10px;color:var(--text2);margin-top:5px;text-align:right;"></div>
+      </div><!-- /filter-detail -->
     </div>
 
     <div class="side-section" id="stats-section" style="display:none">
@@ -315,9 +317,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       <div class="color-row">
         <label>グリッドカラー</label>
         <input type="color" id="colorGrid" value="#1e3a5f">
-      </div>
-      <div style="margin-top:10px;">
-        <button class="btn btn-primary btn-sm" id="btn-apply" style="width:100%">適用</button>
       </div>
     </div>
 
@@ -748,7 +747,8 @@ function renderFlightTable(list) {
   tbody.innerHTML = '';
   list.forEach(f => {
     const maskedName = hideDT ? f.name.replace(/\d{14}/, '**...**') : f.name;
-    const shortName = maskedName.length > 22 ? maskedName.substring(0, 19) + '...' : maskedName;
+    // 日時表示時はフル表示（CSS省略+ホバー）、非表示時はマスク名そのまま
+    const displayName = maskedName;
     const distStr = f._dist >= 1000 ? (f._dist/1000).toFixed(1)+'km' : Math.round(f._dist)+'m';
     const div = document.createElement('div');
     div.style.cssText = `display:flex;align-items:flex-start;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);`;
@@ -756,7 +756,7 @@ function renderFlightTable(list) {
       <input type="checkbox" data-id="${f.id}" ${f.visible ? 'checked' : ''} style="margin-top:3px;accent-color:var(--accent);flex-shrink:0;">
       <div style="width:8px;height:8px;border-radius:50%;background:${f.color};flex-shrink:0;margin-top:4px;"></div>
       <div style="min-width:0;flex:1;">
-        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${maskedName}">${shortName}</div>
+        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${displayName}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px;">
           📅 ${f._date} &nbsp;⏱ ${fmtDur(Math.round(f._dur))}<br>
           ↑ ${f._maxAlt.toFixed(0)}m &nbsp; 🛤 ${distStr} &nbsp; 📍 ${f._locKey}
@@ -1556,16 +1556,20 @@ document.querySelectorAll('.map-tab').forEach(tab => {
 });
 
 // 設定適用
-document.getElementById('btn-apply').onclick = () => {
+// 表示設定：全コントロールを即時反映
+function applySettings() {
   saveSettings();
   if (allPts.length) { render3D(false); update2D(); updateLegend(); }
-};
-
-// スライダー表示更新
-document.getElementById('altScale').oninput = function() { document.getElementById('altScaleVal').textContent = this.value + 'x'; };
-document.getElementById('zoomSpeed').oninput = function() { document.getElementById('zoomSpeedVal').textContent = this.value; };
-document.getElementById('markerSize').oninput = function() { document.getElementById('markerSizeVal').textContent = this.value + 'x'; };
-document.getElementById('pointSize').oninput = function() { document.getElementById('pointSizeVal').textContent = this.value + 'x'; };
+}
+document.getElementById('altScale').oninput = function() { document.getElementById('altScaleVal').textContent = this.value + 'x'; applySettings(); };
+document.getElementById('zoomSpeed').oninput = function() { document.getElementById('zoomSpeedVal').textContent = this.value; saveSettings(); };
+document.getElementById('markerSize').oninput = function() { document.getElementById('markerSizeVal').textContent = this.value + 'x'; applySettings(); };
+document.getElementById('pointSize').oninput = function() { document.getElementById('pointSizeVal').textContent = this.value + 'x'; applySettings(); };
+document.getElementById('showShadow').onchange = applySettings;
+document.getElementById('colorLow').oninput = applySettings;
+document.getElementById('colorHigh').oninput = applySettings;
+document.getElementById('colorGrid').oninput = applySettings;
+document.querySelectorAll('input[name="colorMode"]').forEach(r => r.onchange = applySettings);
 
 // リセット
 document.getElementById('btn-reset-view').onclick = () => {
@@ -1883,7 +1887,23 @@ window.addEventListener('resize', () => {
   if (leafletMap) leafletMap.invalidateSize();
 });
 document.getElementById('map-credit').textContent = TILE_LAYERS[currentLayer].credit;
-document.getElementById('pdf-hide-datetime').onchange = () => { renderFileList(); updateWaypoints(); };
+document.getElementById('pdf-hide-datetime').onchange = function() {
+  if (this.checked) {
+    // 日時非表示：日付フィルターリセット・全ファイル非表示
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    // allFiles.forEach(f => f.visible = false);
+  } else {
+    // 日時表示に戻す：日付を全期間に戻す
+    const dates = allFiles.map(f => f._date).sort();
+    if (dates.length) {
+      document.getElementById('filter-date-from').value = dates[0];
+      document.getElementById('filter-date-to').value = dates[dates.length - 1];
+    }
+  }
+  applyFilter();
+  updateWaypoints();
+};
 loadSettings();
 </script>
 </body>
