@@ -127,7 +127,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
 #view-3d { position: absolute; inset: 0; }
 #three-canvas { display: block; width: 100%; height: 100%; }
 #view-map { position: absolute; inset: 0; display: none; }
-#leaflet-map { width: 100%; height: 100%; touch-action: none; }
+#leaflet-map { width: 100%; height: 100%; touch-action: none;}
 
 /* オフスクリーン地図（3D用テクスチャ生成） */
 #offscreen-map-container {
@@ -167,7 +167,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
 #hint3d { position: absolute; right: 12px; bottom: 12px; z-index: 100; font-size: 11px; color: rgba(255,255,255,0.35); text-align: right; line-height: 1.8; pointer-events: none; }
 
 /* 空ステート */
+#empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; } justify-content: center; gap: 12px; pointer-events: none; }
+
+/* 変更後 */
 #empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; z-index: 10; }
+
+
 #empty-state .big-icon { font-size: 128px; opacity: 0.4; }
 #empty-state p { color: var(--text2); opacity: 0.7; font-size: 14px; text-align:center; white-space: pre-line; line-height:1.7; }
 
@@ -195,30 +200,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
 /* エラー */
 #error-msg { color: var(--red); font-size: 12px; padding: 6px 0; display: none; }
 
-/* モバイルオーバーレイボタン（デフォルト非表示） */
-#mobile-overlay-buttons { display: none; }
-
 @media (max-width: 768px) {
   #main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   #sidebar { max-height: 45vh; }
   #view-area { min-height: 55vh; }
-  #header { padding: 8px 12px; }
-  #header h1 { font-size: 15px; }
-  #header-buttons { display: none; }
-  #mobile-overlay-buttons {
-    display: flex;
-    position: absolute;
-    top: 52px;
-    right: 12px;
-    z-index: 1001;
-    gap: 5px;
-  }
-  #mobile-overlay-buttons .btn-sm {
-    background: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    font-size: 11px;
-    padding: 4px 8px;
-  }
 }
 </style>
 </head>
@@ -228,8 +213,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
   <h1 style="font-family:'Rajdhani',sans-serif;font-size:20px;letter-spacing:1px;color:var(--text2);font-weight:400;">
     Flight Path Visualizer
   </h1>
-  <div id="header-buttons" style="display:flex;gap:8px;">
-    <!-- <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button> -->
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button>
     <button class="btn btn-ghost btn-sm" id="btn-export-pdf" style="border-color:rgba(34,211,238,0.4);color:var(--accent2);">📄 PDF出力</button>
     <button class="btn btn-ghost btn-sm" id="btn-about" style="border-color:rgba(100,160,255,0.3);">ℹ️</button>
   </div>
@@ -253,6 +238,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
         <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-files">📄 ファイル</button>
         <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;" id="btn-pick-folder">📁 フォルダ</button>
       </div>
+      <!-- フォルダパス表示 -->
       <div id="folder-path-box" style="display:none;margin-top:8px;padding:5px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;">
         <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">読み込みフォルダ</div>
         <div id="folder-path-text" style="font-size:11px;color:var(--accent2);word-break:break-all;"></div>
@@ -264,12 +250,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
     <div class="side-section" id="flight-list-section" style="display:none">
       <h3>フライト一覧</h3>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px;">
+        <!-- 場所プルダウン -->
         <div style="display:flex;gap:4px;align-items:center;">
           <select id="filter-location" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;">
             <option value="">📍 場所（すべて）</option>
           </select>
           <button id="btn-loc-mode" title="地名/座標 切り替え" style="flex-shrink:0;padding:4px 7px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;">🗺</button>
         </div>
+        <!-- 日付範囲・一覧（日時非表示時は隠す） -->
         <div id="filter-detail">
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="filter-date-from" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:11px;outline:none;">
@@ -284,7 +272,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       </div>
       <div id="flight-table-body" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
       <div id="flight-count" style="font-size:10px;color:var(--text2);margin-top:5px;text-align:right;"></div>
-      </div>
+      </div><!-- /filter-detail -->
     </div>
 
     <div class="side-section" id="stats-section" style="display:none">
@@ -340,11 +328,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
         <input type="range" id="markerSize" min="0.2" max="1.0" step="0.1" value="0.6">
         <span class="ctrl-val" id="markerSizeVal">0.6x</span>
       </div>
+      <!-- ポイントサイズ -->
       <div class="ctrl-row">
         <span class="ctrl-label">ポイント径</span>
         <input type="range" id="pointSize" min="0.5" max="3.0" step="0.1" value="1.0">
         <span class="ctrl-val" id="pointSizeVal">1.0x</span>
       </div>
+      <!-- 影表示 -->
       <div style="margin:10px 0;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
           <input type="checkbox" id="showShadow" checked>
@@ -388,43 +378,43 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
     <div id="view-map">
       <div id="leaflet-map"></div>
     </div>
-
-    <!-- 横並びの親 -->
-    <div id="toolbar" style="display:flex; gap:8px; align-items:center;">
-      <!-- ビュー切り替え -->
-      <div id="view-toggle" style="display:flex; gap:4px;">
-        <div class="vtab active" data-view="3d">3D</div>
-        <div class="vtab" data-view="2d">2D</div>
-      </div>
-      <!-- ビュー切り替え -->
-      <button class="btn btn-ghost btn-sm" id="btn-reset-view-m">リセット</button>
+    <!-- ビュー切り替え -->
+    <div id="view-toggle">
+      <div class="vtab active" data-view="3d">3D</div>
+      <div class="vtab" data-view="2d">2D 地図</div>
     </div>
 
     <!-- コンパス -->
     <div id="compass">
       <svg id="compass-svg" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        <!-- 固定：中心の小円 -->
         <circle cx="18" cy="18" r="2" fill="rgba(255,255,255,0.5)"/>
+        <!-- 回転するディスク（NS WE ラベル＋目盛り） -->
         <g id="compass-disk" transform="rotate(0,18,18)">
           <text x="18" y="5"    text-anchor="middle" fill="#ef4444"            font-size="6" font-family="Rajdhani,sans-serif" font-weight="700">N</text>
           <text x="18" y="34.5" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="6" font-family="Rajdhani,sans-serif">S</text>
           <text x="3"  y="19.5" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="6" font-family="Rajdhani,sans-serif">W</text>
           <text x="33" y="19.5" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="6" font-family="Rajdhani,sans-serif">E</text>
+          <!-- 目盛り線（N/S/E/W） -->
           <line x1="18" y1="7.5" x2="18" y2="10"  stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
           <line x1="18" y1="26" x2="18" y2="28.5" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
           <line x1="7.5" y1="18" x2="10" y2="18"  stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
           <line x1="26" y1="18" x2="28.5" y2="18" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
         </g>
+        <!-- 固定：北を指す三角マーク（画面上側に常に固定） -->
         <polygon points="18,8 19.5,12 16.5,12" fill="rgba(255,255,255,0.25)"/>
       </svg>
     </div>
     
-    <!-- ズームボタン -->
+    <!-- ズームボタン（3D/2D共通、右上） -->
     <div id="zoom-ctrl">
       <button id="btn-zoom-in" title="拡大">+</button>
       <button id="btn-zoom-out" title="縮小">−</button>
     </div>
     
+    <!-- ホバーツールチップ -->
     <div id="tooltip3d"><div class="tt-title" id="tt-title"></div><div id="tt-body"></div></div>
+
     <div id="hint3d">左ドラッグ: 回転 &nbsp;右ドラッグ: 移動<br>ホイール: ズーム</div>
     <div id="map-credit" style="position:absolute;right:12px;bottom:12px;z-index:1000;font-size:10px;color:rgba(255,255,255,0.5);background:rgba(0,0,0,0.4);padding:3px 7px;border-radius:4px;pointer-events:none;"></div>
     <div id="legend" style="display:none">
@@ -434,7 +424,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
   </div>
 </div>
 
-<!-- オフスクリーン地図 -->
+<!-- オフスクリーン地図（3D用テクスチャ取得） -->
 <div id="offscreen-map-container">
   <div id="offscreen-leaflet"></div>
 </div>
@@ -446,7 +436,7 @@ const deg2rad = d => d * Math.PI / 180;
 function latLonToMeters(lat, lon, refLat, refLon) {
   return {
     x: deg2rad(lon - refLon) * Math.cos(deg2rad(refLat)) * R,
-    y: -deg2rad(lat - refLat) * R
+    y: -deg2rad(lat - refLat) * R  // Z軸方向を反転（北が奥）
   };
 }
 function haversine(a, b) {
@@ -520,12 +510,13 @@ function sampleBySecond(frames) {
 
 // ===== データ管理 =====
 const COLORS = ['#3b82f6','#22d3ee','#a78bfa','#34d399','#f59e0b','#f87171','#e879f9','#fb923c'];
-let allFiles = [];
-let files = [];
+let allFiles = []; // 全読み込みファイル（チェック状態を保持）
+let files = [];    // 表示中ファイル（allFilesのうちvisible:true）
 let allPts = [];
 let refLat = 0, refLon = 0;
 let sortKey = 'date', sortAsc = false;
 
+// 変更後
 function recomputeAll() {
   if (!files.length) {
     allPts = [];
@@ -559,6 +550,7 @@ function recomputeAll() {
   allPts.sort((a, b) => a.ts.localeCompare(b.ts));
   updateStats();
   updateWaypoints();
+  // 3Dは地図テクスチャ取得後にレンダリング
   buildMapTextureAndRender3D();
   update2D();
   updateLegend();
@@ -649,15 +641,16 @@ function addFiles(fileList) {
 }
 
 // ===== 場所ラベル管理 =====
-let locLabelMode = 'latlon';
-let locNameCache = {};
+let locLabelMode = 'latlon'; // 'latlon' | 'name'
+let locNameCache = {};       // locKey -> 地名文字列
 let userLat = null, userLon = null;
 
+// 起動時に現在地を取得
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(pos => {
     userLat = pos.coords.latitude;
     userLon = pos.coords.longitude;
-    if (allFiles.length) finalizeLoad();
+    if (allFiles.length) finalizeLoad(); // 再ソート
   }, () => {});
 }
 
@@ -675,9 +668,11 @@ async function fetchLocName(key, lat, lon) {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
     const data = await res.json();
     const addr = data.address || {};
+    // 市区町村を優先：city_district（区）> city（市）> town（町）> village（村）> county > state
     const name = addr.city_district || addr.suburb ||
-                 (addr.city ? addr.city : null) ||
+                 (addr.city ? addr.city + (addr.city_district ? '' : '') : null) ||
                  addr.town || addr.village || addr.county || addr.state || key;
+    // 「市 + 区」の形で表示（例：横浜市 港北区）
     const full = addr.city && addr.city_district
       ? `${addr.city} ${addr.city_district}`
       : addr.city && addr.suburb
@@ -688,6 +683,7 @@ async function fetchLocName(key, lat, lon) {
   } catch(e) { locNameCache[key] = key; return key; }
 }
 
+// locKeyの配列を現在地に近い順で返す
 function getSortedLocKeys() {
   const keys = [...new Set(allFiles.map(f => f._locKey))];
   if (userLat !== null) {
@@ -702,6 +698,7 @@ function getSortedLocKeys() {
 
 async function buildLocationDropdown(selectKey, labelOnly = false) {
   const locSel = document.getElementById('filter-location');
+  // labelOnly=true のときは現在の選択値を保持してラベルだけ書き換える
   const prevKey = labelOnly ? locSel.value : undefined;
   const keys = getSortedLocKeys();
 
@@ -730,30 +727,36 @@ async function buildLocationDropdown(selectKey, labelOnly = false) {
   locSel.appendChild(allOpt);
 
   if (labelOnly) {
+    // ラベル切り替えのみ：選択値を復元するだけでフィルターは変えない
     locSel.value = (prevKey !== undefined && [...locSel.options].some(o => o.value === prevKey))
       ? prevKey : (keys.length > 0 ? keys[0] : '');
   } else if (selectKey !== undefined && [...locSel.options].some(o => o.value === selectKey)) {
     locSel.value = selectKey;
   } else if (keys.length > 0) {
-    locSel.value = keys[0];
+    locSel.value = keys[0]; // 現在地に最も近い場所をデフォルト選択
   }
 }
 
 function finalizeLoad() {
+  // 日付フィルターを全期間にリセット（追加読み込みでは再計算）
   const dates = allFiles.map(f => f._date).sort();
   document.getElementById('filter-date-from').value = dates[0];
   document.getElementById('filter-date-to').value   = dates[dates.length-1];
+
   document.getElementById('flight-list-section').style.display = 'block';
+
+  // 初回(curLoc='')は最近傍キーを渡す。追加読み込み時は現在の選択を引き継ぐ
   const curLoc = document.getElementById('filter-location').value;
   const nearestKey = getSortedLocKeys()[0];
   buildLocationDropdown(curLoc || nearestKey).then(() => applyFilter());
 }
 
 function applyFilter() {
-  const locVal  = document.getElementById('filter-location').value;
+  const locVal  = document.getElementById('filter-location').value; // '' = すべて
   const fromVal = document.getElementById('filter-date-from').value;
   const toVal   = document.getElementById('filter-date-to').value;
 
+  // 一覧に表示するファイル（フィルター条件に合うもの）
   let list = allFiles.filter(f => {
     if (locVal  && f._locKey !== locVal) return false;
     if (fromVal && f._date < fromVal) return false;
@@ -770,6 +773,8 @@ function applyFilter() {
     return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
   });
   renderFlightTable(list);
+
+  // 表示ファイル = フィルター条件 AND checked
   files = list.filter(f => f.visible);
   syncDisplay(list);
 }
@@ -780,6 +785,8 @@ function renderFlightTable(list) {
   tbody.innerHTML = '';
   list.forEach(f => {
     const maskedName = hideDT ? f.name.replace(/\d{14}/, '**...**') : f.name;
+    // 日時表示時はフル表示（CSS省略+ホバー）、非表示時はマスク名そのまま
+    const displayName = maskedName;
     const distStr = f._dist >= 1000 ? (f._dist/1000).toFixed(1)+'km' : Math.round(f._dist)+'m';
     const div = document.createElement('div');
     div.style.cssText = `display:flex;align-items:flex-start;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);`;
@@ -787,7 +794,7 @@ function renderFlightTable(list) {
       <input type="checkbox" data-id="${f.id}" ${f.visible ? 'checked' : ''} style="margin-top:3px;accent-color:var(--accent);flex-shrink:0;">
       <div style="width:8px;height:8px;border-radius:50%;background:${f.color};flex-shrink:0;margin-top:4px;"></div>
       <div style="min-width:0;flex:1;">
-        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${maskedName}</div>
+        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${displayName}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px;">
           📅 ${f._date} &nbsp;⏱ ${fmtDur(Math.round(f._dur))}<br>
           ↑ ${f._maxAlt.toFixed(0)}m &nbsp; 🛤 ${distStr} &nbsp; 📍 ${f._locKey}
@@ -812,6 +819,7 @@ function updateCountLabel(list) {
     `${list.length} / ${allFiles.length} 件 (${list.filter(f=>f.visible).length}件表示中)`;
 }
 
+// 表示/非表示を地図に反映し、必要なメッセージを出す
 function syncDisplay(filteredList) {
   if (!files.length) {
     allPts = [];
@@ -822,6 +830,7 @@ function syncDisplay(filteredList) {
     document.getElementById('stats-section').style.display = 'none';
     document.getElementById('waypoints-section').style.display = 'none';
     document.getElementById('legend').style.display = 'none';
+    // メッセージ判定
     if (allFiles.length === 0) {
       setEmptyState('🛸', 'SRTファイルを読み込んでください');
     } else if (filteredList.length === 0) {
@@ -841,19 +850,26 @@ function setEmptyState(icon, msg) {
   document.getElementById('empty-state').style.display = 'flex';
 }
 
+function showNoDataMessage(reason) { setEmptyState('🚫', reason); } // 後方互換
+
+function syncFilesAndRedraw() { applyFilter(); } // 後方互換
+
+function renderFileList() {
+  // 互換性のため残す（waypointsなどが使う）
+  // 新UIではflightTableが主役なので何もしない
+}
+
 function showError(msg) {
   const el = document.getElementById('error-msg');
   el.textContent = msg; el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
-function renderFileList() {}
-
-// ===== オフスクリーン地図 =====
+// ===== オフスクリーン地図（3D テクスチャ用） =====
 let offscreenMap = null;
 let offscreenLayer = null;
-let mapTexture = null;
-let mapTextureBounds = null;
+let mapTexture = null; // THREE.Texture
+let mapTextureBounds = null; // { minLat, maxLat, minLon, maxLon }
 
 const TILE_LAYERS = {
   osm:       { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',          attr: '© OpenStreetMap contributors',       credit: '© OpenStreetMap contributors' },
@@ -864,38 +880,70 @@ const TILE_LAYERS = {
 function initOffscreenMap() {
   if (offscreenMap) return;
   offscreenMap = L.map('offscreen-leaflet', {
-    zoomControl: false, attributionControl: false,
-    fadeAnimation: false, zoomAnimation: false,
+    zoomControl: false,
+    attributionControl: false,
+    fadeAnimation: false,
+    zoomAnimation: false,
   });
-  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
   offscreenLayer.addTo(offscreenMap);
 }
 
 function updateOffscreenLayer() {
   if (!offscreenMap) return;
   if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
-  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
   offscreenLayer.addTo(offscreenMap);
 }
 
+/**
+ * オフスクリーン地図を対象範囲にフィットさせ、
+ * タイル読み込み完了後にcanvas2dで描画してThree.jsテクスチャ化する
+ */
 function buildMapTextureAndRender3D() {
   if (!allPts.length) { render3D(); return; }
+
   initOffscreenMap();
+
   const lats = allPts.map(p => p.lat);
   const lons = allPts.map(p => p.lon);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-  const latSpan = maxLat - minLat, lonSpan = maxLon - minLon;
+
+  // マージン25%（飛行スパンの1.5倍の地図範囲）
+  const latSpan = maxLat - minLat;
+  const lonSpan = maxLon - minLon;
   const minMargin = 0.001;
   const dLat = Math.max(latSpan * 0.25, minMargin);
   const dLon = Math.max(lonSpan * 0.25, minMargin);
+
   const bMinLat = minLat - dLat, bMaxLat = maxLat + dLat;
   const bMinLon = minLon - dLon, bMaxLon = maxLon + dLon;
-  mapTextureBounds = { minLat: bMinLat, maxLat: bMaxLat, minLon: bMinLon, maxLon: bMaxLon };
+
+  mapTextureBounds = {
+    minLat: bMinLat, maxLat: bMaxLat,
+    minLon: bMinLon, maxLon: bMaxLon
+  };
+
+  // コンテナは常に正方形1024x1024 — Leafletのfitは内部でアスペクト調整済み
+  // getBoundsで実際の表示範囲を取得するので、コンテナ形状は関係なし
+  const BASE = 1024;
+  const cW = BASE, cH = BASE;
+
   const cont = document.getElementById('offscreen-map-container');
-  cont.style.width = '1024px'; cont.style.height = '1024px';
+  cont.style.width = cW + 'px';
+  cont.style.height = cH + 'px';
   offscreenMap.invalidateSize({ animate: false });
-  offscreenMap.fitBounds([[bMinLat, bMinLon], [bMaxLat, bMaxLon]]);
+
+  const bounds = [[bMinLat, bMinLon], [bMaxLat, bMaxLon]];
+  offscreenMap.fitBounds(bounds);
+
   let waited = 0;
   const maxWait = 8000, interval = 300;
   function tryCapture() {
@@ -903,38 +951,67 @@ function buildMapTextureAndRender3D() {
     const tilesLoading = document.querySelectorAll('#offscreen-leaflet .leaflet-tile-pane img.leaflet-tile').length;
     const tilesLoaded  = document.querySelectorAll('#offscreen-leaflet .leaflet-tile-pane img.leaflet-tile-loaded').length;
     if ((tilesLoading > 0 && tilesLoaded >= tilesLoading) || waited >= maxWait) {
-      captureMapToTexture(); render3D();
+      captureMapToTexture();
+      render3D();
     } else { setTimeout(tryCapture, interval); }
   }
   setTimeout(tryCapture, 600);
 }
 
 function captureMapToTexture() {
+  // Leafletが実際に表示している地理範囲を正確に取得
   if (offscreenMap) {
     const actualBounds = offscreenMap.getBounds();
     mapTextureBounds = {
-      minLat: actualBounds.getSouth(), maxLat: actualBounds.getNorth(),
-      minLon: actualBounds.getWest(), maxLon: actualBounds.getEast()
+      minLat: actualBounds.getSouth(),
+      maxLat: actualBounds.getNorth(),
+      minLon: actualBounds.getWest(),
+      maxLon: actualBounds.getEast()
     };
   }
+
   const container = document.getElementById('offscreen-leaflet');
-  const W = container.offsetWidth || 1024, H = container.offsetHeight || 1024;
+  const W = container.offsetWidth || 1024;
+  const H = container.offsetHeight || 1024;
+
+  // Canvasタイルの場合は直接取得; PNG/JPGタイルはimg要素からdrawImage
   const offCanvas = document.createElement('canvas');
-  offCanvas.width = W; offCanvas.height = H;
+  offCanvas.width = W;
+  offCanvas.height = H;
   const ctx = offCanvas.getContext('2d');
-  ctx.fillStyle = '#242424'; ctx.fillRect(0, 0, W, H);
+
+  // 背景
+  ctx.fillStyle = '#242424';
+  ctx.fillRect(0, 0, W, H);
+
+  // タイル画像を順に描画（位置はスタイルから取得）
   const pane = container.querySelector('.leaflet-tile-pane');
   if (pane) {
-    pane.querySelectorAll('img.leaflet-tile-loaded').forEach(img => {
-      try {
-        const rect = img.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        const x = rect.left - containerRect.left, y = rect.top - containerRect.top;
-        const imgStyle = window.getComputedStyle(img);
-        ctx.drawImage(img, x, y, parseFloat(imgStyle.width)||256, parseFloat(imgStyle.height)||256);
-      } catch(e) {}
+    // 各transformコンテナを処理
+    const layers = pane.querySelectorAll('.leaflet-layer');
+    layers.forEach(layer => {
+      const layerTransform = getComputedTransform(layer);
+      const imgs = layer.querySelectorAll('img.leaflet-tile-loaded');
+      imgs.forEach(img => {
+        try {
+          const tileTransform = getComputedTransform(img.parentElement); // .leaflet-tile-container
+          const imgStyle = window.getComputedStyle(img);
+          const w = parseFloat(imgStyle.width) || 256;
+          const h = parseFloat(imgStyle.height) || 256;
+
+          // img要素の位置を親要素から取得
+          const rect = img.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const x = rect.left - containerRect.left;
+          const y = rect.top - containerRect.top;
+
+          ctx.drawImage(img, x, y, w, h);
+        } catch(e) { /* クロスオリジンのタイルはスキップ */ }
+      });
     });
   }
+
+  // Three.jsテクスチャ化
   if (mapTexture) mapTexture.dispose();
   mapTexture = new THREE.CanvasTexture(offCanvas);
   mapTexture.needsUpdate = true;
@@ -942,10 +1019,14 @@ function captureMapToTexture() {
 
 function getComputedTransform(el) {
   if (!el) return { x: 0, y: 0 };
-  const transform = window.getComputedStyle(el).transform;
+  const style = window.getComputedStyle(el);
+  const transform = style.transform;
   if (!transform || transform === 'none') return { x: 0, y: 0 };
   const mat = transform.match(/matrix\(([^)]+)\)/);
-  if (mat) { const vals = mat[1].split(',').map(Number); return { x: vals[4]||0, y: vals[5]||0 }; }
+  if (mat) {
+    const vals = mat[1].split(',').map(Number);
+    return { x: vals[4] || 0, y: vals[5] || 0 };
+  }
   return { x: 0, y: 0 };
 }
 
@@ -1007,7 +1088,8 @@ function loadSettings() {
 function render3D(resetView) {
   if (!allPts.length) return;
   const container = document.getElementById('view-3d');
-  const W = container.clientWidth || 800, H = container.clientHeight || 520;
+  const W = container.clientWidth || 800;
+  const H = container.clientHeight || 520;
   const canvas = document.getElementById('three-canvas');
   const s = getSettings();
 
@@ -1016,6 +1098,7 @@ function render3D(resetView) {
     renderer3d.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
   renderer3d.setSize(W, H);
+
   scene3d = new THREE.Scene();
   scene3d.background = new THREE.Color(0x0a0a1a);
   scene3d.fog = new THREE.FogExp2(0x0a0a1a, 0.0005);
@@ -1035,32 +1118,37 @@ function render3D(resetView) {
   const maxX = Math.max(...xs), minX = Math.min(...xs);
   const maxZ = Math.max(...zs), minZ = Math.min(...zs);
   const spanX = maxX - minX, spanZ = maxZ - minZ;
-  const span = Math.max(spanX, spanZ, 200);
+  const span = Math.max(spanX, spanZ, 200);  // 最小200m（ホバリング対応）
   const maxAlt = Math.max(...allPts.map(p => p.alt)) * s.altScale;
 
   target3d = new THREE.Vector3(cx, maxAlt * 0.3, cz);
   if (resetView !== false) {
     sph.r = Math.max(span * 1.3, 300);
-    sph.theta = 0; sph.phi = Math.PI / 6;
+    sph.theta = 0;
+    sph.phi = Math.PI / 6;
   }
   defaultSph = { theta: 0, phi: Math.PI / 6, r: Math.max(span * 1.3, 300) };
   defaultTarget3d = target3d.clone();
   updateCamera3D();
 
+  // グリッド
   const gc = s.colorGrid;
   const gridColor1 = new THREE.Color(gc.r*1.5, gc.g*1.5, gc.b*1.5);
   const gridColor2 = new THREE.Color(gc.r, gc.g, gc.b);
-  const gridSize = span * 2;
+  const gridSize = span * 2;  // span * 3 → 5 に拡大
   const grid = new THREE.GridHelper(gridSize, 20, gridColor1, gridColor2);
   grid.position.set(cx, 0.1, cz);
   scene3d.add(grid);
 
+  // ===== 地面プレーン =====
   if (mapTexture && mapTextureBounds) {
     const tb = mapTextureBounds;
+    // テクスチャ境界をメートル座標に変換（latLonToMetersと同じ変換）
     const mxL = deg2rad(tb.minLon - refLon) * Math.cos(deg2rad(refLat)) * R;
     const mxR = deg2rad(tb.maxLon - refLon) * Math.cos(deg2rad(refLat)) * R;
-    const myT = -deg2rad(tb.maxLat - refLat) * R;
-    const myB = -deg2rad(tb.minLat - refLat) * R;
+    const myT = -deg2rad(tb.maxLat - refLat) * R;  // 北 = 小さいmy
+    const myB = -deg2rad(tb.minLat - refLat) * R;  // 南 = 大きいmy
+    // プレーンをテクスチャ境界ぴったりで作成 → UV=0〜1で完全一致
     const planeGeo = new THREE.PlaneGeometry(mxR - mxL, myB - myT);
     const planeMat = new THREE.MeshBasicMaterial({ map: mapTexture });
     const plane = new THREE.Mesh(planeGeo, planeMat);
@@ -1076,12 +1164,14 @@ function render3D(resetView) {
     scene3d.add(plane);
   }
 
+  // ===== 経路・ポイント描画 =====
   const hoverSpheres = [];
   files.forEach(f => {
     const pts = allPts.filter(p => p.fileId === f.id);
     if (pts.length < 2) return;
     const useAltColor = s.colorMode === 'altitude';
 
+    // 経路ライン
     const positions = [], colors = [];
     pts.forEach(p => {
       positions.push(p.mx, p.alt * s.altScale, p.my);
@@ -1093,7 +1183,9 @@ function render3D(resetView) {
           s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
           s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
         );
-      } else { c = new THREE.Color(f.color); }
+      } else {
+        c = new THREE.Color(f.color);
+      }
       colors.push(c.r, c.g, c.b);
     });
     const lineGeo = new THREE.BufferGeometry();
@@ -1101,9 +1193,11 @@ function render3D(resetView) {
     lineGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     scene3d.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 1 })));
 
+    // ポイント球のジオメトリを先に定義
     const dotR = Math.max(0.3, span * 0.004) * s.pointScale;
     const dotGeo = new THREE.SphereGeometry(dotR, 8, 8);
 
+    // 地面影（ON/OFF対応）
     if (s.showShadow) {
       const shadowPos = [], shadowColors = [];
       pts.forEach(p => {
@@ -1121,6 +1215,7 @@ function render3D(resetView) {
       sGeo.setAttribute('color', new THREE.Float32BufferAttribute(shadowColors, 3));
       scene3d.add(new THREE.Line(sGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.1 })));
 
+      // 影のポイント
       const shadowDotGeo = new THREE.SphereGeometry(dotR, 8, 8);
       pts.forEach(p => {
         const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
@@ -1129,11 +1224,17 @@ function render3D(resetView) {
           s.colorLow.g + (s.colorHigh.g - s.colorLow.g) * t,
           s.colorLow.b + (s.colorHigh.b - s.colorLow.b) * t
         ) : new THREE.Color(f.color);
-        const shadowDot = new THREE.Mesh(shadowDotGeo, new THREE.MeshBasicMaterial({ color: sc, transparent: true, opacity: 0.2 }));
+        const shadowDot = new THREE.Mesh(
+          shadowDotGeo,
+          new THREE.MeshBasicMaterial({ color: sc, transparent: true, opacity: 0.2 })
+        );
         shadowDot.position.set(p.mx, 0.15, p.my);
         scene3d.add(shadowDot);
       });
+    }
 
+    // 垂直線（間引き、影ON時のみ表示）
+    if (s.showShadow) {
       const vstep = Math.max(1, Math.floor(pts.length / 40));
       for (let i = 0; i < pts.length; i += vstep) {
         const p = pts[i];
@@ -1151,7 +1252,7 @@ function render3D(resetView) {
         scene3d.add(new THREE.Line(vGeo, new THREE.LineBasicMaterial({ color: vc, transparent: true, opacity: 0.2 })));
       }
     }
-
+    // ===== 1秒ごとのポイント球（可視化・ホバー対応） =====
     pts.forEach(p => {
       const t = maxAlt > 0 ? Math.max(0, Math.min(1, (p.alt * s.altScale) / maxAlt)) : 0;
       let dotColor;
@@ -1163,9 +1264,13 @@ function render3D(resetView) {
         );
       } else { dotColor = new THREE.Color(f.color); }
 
+      // 可視のポイント球（opacity 0.75で表示）
       const dot = new THREE.Mesh(dotGeo, new THREE.MeshLambertMaterial({
-        color: dotColor, transparent: true, opacity: 0.75,
-        emissive: dotColor, emissiveIntensity: 0.15,
+        color: dotColor,
+        transparent: true,
+        opacity: 0.75,
+        emissive: dotColor,
+        emissiveIntensity: 0.15,
       }));
       dot.position.set(p.mx, p.alt * s.altScale, p.my);
       dot.userData = { pt: p, fileName: f.name };
@@ -1173,6 +1278,7 @@ function render3D(resetView) {
       hoverSpheres.push(dot);
     });
 
+    // 離着陸マーカー
     const baseMarker = span * 0.013 * s.markerScale;
     const events = f.events || [
       { type: 'takeoff', frame: pts[0] },
@@ -1221,6 +1327,7 @@ function updateCamera3D() {
     target3d.z + r * Math.sin(phi) * Math.cos(theta)
   );
   camera3d.lookAt(target3d);
+  // コンパス更新: theta=0が南から北向き → 回転
   const disk = document.getElementById('compass-disk');
   if (disk) disk.setAttribute('transform', `rotate(${theta * 180 / Math.PI},18,18)`);
 }
@@ -1258,17 +1365,25 @@ va.addEventListener('wheel', e => {
   updateCamera3D();
 }, { passive: false });
 
-// ズームボタン
+// ズームボタン（3D/2D両対応）
 document.getElementById('btn-zoom-in').onclick = () => {
-  if (currentView === '3d') { sph.r = Math.max(5, sph.r * 0.7); updateCamera3D(); }
-  else if (currentView === '2d' && leafletMap) { leafletMap.zoomIn(); }
+  if (currentView === '3d') {
+    sph.r = Math.max(5, sph.r * 0.7);
+    updateCamera3D();
+  } else if (currentView === '2d' && leafletMap) {
+    leafletMap.zoomIn();
+  }
 };
 document.getElementById('btn-zoom-out').onclick = () => {
-  if (currentView === '3d') { sph.r = sph.r * 1.4; updateCamera3D(); }
-  else if (currentView === '2d' && leafletMap) { leafletMap.zoomOut(); }
+  if (currentView === '3d') {
+    sph.r = sph.r * 1.4;
+    updateCamera3D();
+  } else if (currentView === '2d' && leafletMap) {
+    leafletMap.zoomOut();
+  }
 };
 
-// Raycaster
+// Raycaster（ホバーツールチップ）
 const raycaster = new THREE.Raycaster();
 raycaster.params.Points = { threshold: 2 };
 let lastHovered = null;
@@ -1277,7 +1392,8 @@ function fmtSpeed(a, b) {
   if (!a || !b) return '-';
   const dt = (new Date(b.ts) - new Date(a.ts)) / 1000;
   if (dt <= 0) return '-';
-  return (haversine(a, b) / dt).toFixed(1) + ' m/s';
+  const dist = haversine(a, b);
+  return (dist / dt).toFixed(1) + ' m/s';
 }
 
 va.addEventListener('mousemove', e => {
@@ -1314,17 +1430,15 @@ va.addEventListener('mousemove', e => {
   }
 });
 
-// タッチ操作（passive:false でページスクロールを防止）
 let lastTouchDist = 0;
 va.addEventListener('touchstart', e => {
   if (currentView !== '3d') return;
   if (e.touches.length === 1) { isDrag = true; lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
   if (e.touches.length === 2) { lastTouchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); }
 }, { passive: true });
-
 va.addEventListener('touchmove', e => {
   if (currentView !== '3d') return;
-  e.preventDefault();
+  e.preventDefault(); // ← タッチ操作用追加
   if (e.touches.length === 1 && isDrag) {
     const dx = e.touches[0].clientX - lastMouse.x, dy = e.touches[0].clientY - lastMouse.y;
     lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -1335,8 +1449,7 @@ va.addEventListener('touchmove', e => {
     const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
     sph.r = Math.max(5, sph.r * (lastTouchDist / d)); lastTouchDist = d; updateCamera3D();
   }
-}, { passive: false });
-
+}, { passive: false }); // ← タッチ操作用修正
 va.addEventListener('touchend', () => { isDrag = false; });
 
 // ===== 2D 地図 =====
@@ -1348,14 +1461,18 @@ let leafletMarkers = [];
 
 function initLeaflet() {
   if (leafletMap) return;
-  leafletMap = L.map('leaflet-map', { zoomControl: false, attributionControl: false });
+  leafletMap = L.map('leaflet-map', { zoomControl: false, attributionControl: false });  // ズームコントロール無効化
   switchTileLayer(currentLayer);
 }
 
 function switchTileLayer(key) {
   if (leafletLayerObj) leafletMap.removeLayer(leafletLayerObj);
   const tl = TILE_LAYERS[key];
-  leafletLayerObj = L.tileLayer(tl.url, { attribution: tl.attr, maxZoom: 18, crossOrigin: 'anonymous' });
+  leafletLayerObj = L.tileLayer(tl.url, {
+      attribution: tl.attr,
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
   leafletLayerObj.addTo(leafletMap);
   currentLayer = key;
 }
@@ -1382,12 +1499,15 @@ function update2D() {
         const r = Math.round((lo.r + (hi.r - lo.r) * t) * 255);
         const g = Math.round((lo.g + (hi.g - lo.g) * t) * 255);
         const b = Math.round((lo.b + (hi.b - lo.b) * t) * 255);
-        const seg = L.polyline([[pts[i-1].lat, pts[i-1].lon],[pts[i].lat, pts[i].lon]], { color: `rgb(${r},${g},${b})`, weight: 3, opacity: 0.9 });
-        seg.addTo(leafletMap); leafletPolylines.push(seg);
+        const segColor = `rgb(${r},${g},${b})`;
+        const seg = L.polyline([[pts[i-1].lat, pts[i-1].lon],[pts[i].lat, pts[i].lon]], { color: segColor, weight: 3, opacity: 0.9 });
+        seg.addTo(leafletMap);
+        leafletPolylines.push(seg);
       }
     } else {
       const poly = L.polyline(pts.map(p => [p.lat, p.lon]), { color: f.color, weight: 3, opacity: 0.85 });
-      poly.addTo(leafletMap); leafletPolylines.push(poly);
+      poly.addTo(leafletMap);
+      leafletPolylines.push(poly);
     }
 
     const mkIcon = (color, label) => L.divIcon({
@@ -1406,7 +1526,8 @@ function update2D() {
       const label = ev.type === 'takeoff' ? '離陸' : '着陸';
       const m = L.marker([ev.frame.lat, ev.frame.lon], { icon: mkIcon(color, label) })
         .bindTooltip(`${label}: ${f.name} (${ev.frame.alt.toFixed(1)}m)`);
-      m.addTo(leafletMap); leafletMarkers.push(m);
+      m.addTo(leafletMap);
+      leafletMarkers.push(m);
     });
   });
 
@@ -1429,9 +1550,11 @@ document.querySelectorAll('.vtab').forEach(tab => {
       if (!leafletMap) initLeaflet();
       update2D();
       setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 150);
+      // 2Dは常に北が上なのでコンパス針をリセット
       const needle = document.getElementById('compass-needle');
       if (needle) needle.setAttribute('transform', 'rotate(0,18,18)');
     } else {
+      // 3Dに戻った時にリサイズ強制
       setTimeout(() => {
         if (renderer3d && camera3d) {
           const el = document.getElementById('view-3d');
@@ -1447,18 +1570,24 @@ document.querySelectorAll('.vtab').forEach(tab => {
 
 // 地図レイヤー切り替え
 document.querySelectorAll('.map-tab').forEach(tab => {
-  tab.onclick = () => {
-    document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentLayer = tab.dataset.layer;
-    if (leafletMap) switchTileLayer(tab.dataset.layer);
-    const creditEl = document.getElementById('map-credit');
-    if (creditEl) creditEl.textContent = TILE_LAYERS[currentLayer].credit;
+    
+    tab.onclick = () => {
+      document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentLayer = tab.dataset.layer;
+      if (leafletMap) switchTileLayer(tab.dataset.layer);
+      const creditEl = document.getElementById('map-credit');
+      if (creditEl) creditEl.textContent = TILE_LAYERS[currentLayer].credit;
+    
+    // オフスクリーン地図も更新して3Dテクスチャを再生成
     if (offscreenMap) {
       updateOffscreenLayer();
       if (allPts.length) {
         mapTexture = null;
-        setTimeout(() => { captureMapToTexture(); render3D(); }, 1500);
+        setTimeout(() => {
+          captureMapToTexture();
+          render3D();
+        }, 1500);
       }
     }
     if (currentView === '2d') update2D();
@@ -1466,6 +1595,7 @@ document.querySelectorAll('.map-tab').forEach(tab => {
 });
 
 // 設定適用
+// 表示設定：全コントロールを即時反映
 function applySettings() {
   saveSettings();
   if (allPts.length) { render3D(false); update2D(); updateLegend(); }
@@ -1490,7 +1620,8 @@ document.getElementById('btn-reset-view').onclick = () => {
 
 document.getElementById('btn-clear-all').onclick = () => {
   allFiles = []; files = []; allPts = [];
-  mapTexture = null; mapTextureBounds = null; locNameCache = {};
+  mapTexture = null; mapTextureBounds = null;
+  locNameCache = {};
   renderFileList();
   document.getElementById('folder-path-box').style.display = 'none';
   document.getElementById('folder-path-text').textContent = '';
@@ -1507,7 +1638,8 @@ document.getElementById('btn-clear-all').onclick = () => {
     emptyScene.background = new THREE.Color(0x0a0a1a);
     renderer3d.render(emptyScene, camera3d);
   }
-  scene3d = null; camera3d = null;
+  scene3d = null;
+  camera3d = null;
   if (leafletMap) {
     leafletPolylines.forEach(l=>leafletMap.removeLayer(l));
     leafletMarkers.forEach(m=>leafletMap.removeLayer(m));
@@ -1522,6 +1654,7 @@ dz.addEventListener('dragleave', () => dz.classList.remove('over'));
 dz.addEventListener('drop', e => {
   e.preventDefault(); dz.classList.remove('over');
   const items = e.dataTransfer.items;
+  // フォルダ名をできる限り表示
   if (items && items.length > 0) {
     const entry = items[0].webkitGetAsEntry ? items[0].webkitGetAsEntry() : null;
     if (entry && entry.isDirectory) {
@@ -1535,31 +1668,38 @@ document.getElementById('fi').addEventListener('change', e => { addFiles(e.targe
 document.getElementById('fi-folder').addEventListener('change', e => {
   const files = e.target.files;
   if (files.length > 0) {
+    // webkitRelativePathからフォルダパスを取得（例: "DCIM/DJI_001.SRT" → "DCIM"）
     const firstPath = files[0].webkitRelativePath || files[0].name;
     const folderName = firstPath.includes('/') ? firstPath.split('/')[0] : '(選択フォルダ)';
     document.getElementById('folder-path-text').textContent = `📁 ${folderName}`;
     document.getElementById('folder-path-box').style.display = 'block';
   }
-  addFiles(files); e.target.value='';
+  addFiles(files);
+  e.target.value='';
 });
 document.getElementById('btn-pick-files').onclick = () => document.getElementById('fi').click();
 document.getElementById('btn-pick-folder').onclick = () => document.getElementById('fi-folder').click();
 dz.onclick = (e) => { if (e.target === dz || e.target.tagName === 'DIV' || e.target.tagName === 'P' || e.target.tagName === 'STRONG') document.getElementById('fi').click(); };
 
-// フィルター
+// フィルター操作
 document.getElementById('filter-location').onchange = applyFilter;
 document.getElementById('filter-date-from').onchange = applyFilter;
 document.getElementById('filter-date-to').onchange = applyFilter;
 
+// 地名/緯度経度 切り替えボタン
 document.getElementById('btn-loc-mode').onclick = () => {
   locLabelMode = locLabelMode === 'latlon' ? 'name' : 'latlon';
   document.getElementById('btn-loc-mode').textContent = locLabelMode === 'name' ? '🔢' : '🗺';
   document.getElementById('btn-loc-mode').title = locLabelMode === 'name' ? '緯度経度表示に切り替え' : '地名表示に切り替え';
-  buildLocationDropdown(undefined, true);
+  buildLocationDropdown(undefined, true); // ラベルだけ更新、選択・フィルターは変えない
 };
 
-document.getElementById('btn-check-all').onclick = () => { allFiles.forEach(f => f.visible = true); applyFilter(); };
-document.getElementById('btn-uncheck-all').onclick = () => { allFiles.forEach(f => f.visible = false); applyFilter(); };
+document.getElementById('btn-check-all').onclick = () => {
+  allFiles.forEach(f => f.visible = true); applyFilter();
+};
+document.getElementById('btn-uncheck-all').onclick = () => {
+  allFiles.forEach(f => f.visible = false); applyFilter();
+};
 document.getElementById('btn-filter-clear').onclick = () => {
   document.getElementById('filter-location').value = '';
   document.getElementById('filter-date-from').value = '';
@@ -1567,10 +1707,6 @@ document.getElementById('btn-filter-clear').onclick = () => {
   allFiles.forEach(f => f.visible = true); finalizeLoad();
 };
 
-// モバイル用オーバーレイボタン
-document.getElementById('btn-reset-view-m').onclick = () => document.getElementById('btn-reset-view').click();
-document.getElementById('btn-export-pdf-m').onclick = () => document.getElementById('btn-export-pdf').click();
-document.getElementById('btn-about-m').onclick = () => document.getElementById('btn-about').click();
 
 // ===== PDF出力 =====
 document.getElementById('btn-export-pdf').onclick = async () => {
@@ -1578,23 +1714,29 @@ document.getElementById('btn-export-pdf').onclick = async () => {
   const btn = document.getElementById('btn-export-pdf');
   btn.textContent = '⏳ 生成中...'; btn.disabled = true;
   try {
+    // 3D: WebGLレンダラーから直接取得
     let imgDataUrl = null;
     
     if (currentView === '3d' && renderer3d && scene3d && camera3d) {
-      const origBg = scene3d.background, origFog = scene3d.fog;
-      scene3d.background = new THREE.Color(0xffffff); scene3d.fog = null;
+      const origBg = scene3d.background;
+      const origFog = scene3d.fog;
+      scene3d.background = new THREE.Color(0xffffff);
+      scene3d.fog = null;
       renderer3d.render(scene3d, camera3d);
-      scene3d.background = origBg; scene3d.fog = origFog;
+      scene3d.background = origBg;
+      scene3d.fog = origFog;
 
       const overlayCanvas = document.createElement('canvas');
       overlayCanvas.width = renderer3d.domElement.width;
       overlayCanvas.height = renderer3d.domElement.height;
       const oc = overlayCanvas.getContext('2d');
+
       const baseImg = new Image();
       baseImg.src = renderer3d.domElement.toDataURL('image/png');
       await new Promise(res => { baseImg.onload = res; });
       oc.drawImage(baseImg, 0, 0);
 
+      // コンパス（右上）
       const cx = overlayCanvas.width - 70, cy = 70, cr = 50;
       const angle = sph.theta;
       oc.beginPath(); oc.arc(cx, cy, cr + 8, 0, Math.PI * 2);
@@ -1621,15 +1763,19 @@ document.getElementById('btn-export-pdf').onclick = async () => {
       oc.beginPath(); oc.arc(cx, cy, 3, 0, Math.PI * 2);
       oc.fillStyle = 'rgba(255,255,255,0.6)'; oc.fill();
 
+      // クレジット（左下）
       const creditText3d = TILE_LAYERS[currentLayer].credit;
-      oc.font = '22px sans-serif'; oc.textAlign = 'left'; oc.textBaseline = 'bottom';
+      oc.font = '22px sans-serif';
+      oc.textAlign = 'left'; oc.textBaseline = 'bottom';
       const tw3d = oc.measureText(creditText3d).width;
       oc.fillStyle = 'rgba(0,0,0,0.45)';
       oc.fillRect(6, overlayCanvas.height - 28, tw3d + 12, 24);
       oc.fillStyle = 'rgba(255,255,255,0.85)';
       oc.fillText(creditText3d, 12, overlayCanvas.height - 6);
-      imgDataUrl = overlayCanvas.toDataURL('image/png');
 
+      imgDataUrl = overlayCanvas.toDataURL('image/png');
+        
+        
     } else if (currentView === '2d' && leafletMap) {
       const mapEl = document.getElementById('leaflet-map');
       const W = mapEl.offsetWidth, H = mapEl.offsetHeight;
@@ -1659,10 +1805,13 @@ document.getElementById('btn-export-pdf').onclick = async () => {
       });
       ctx.globalAlpha = 1;
       const creditText2d = TILE_LAYERS[currentLayer].credit;
-      ctx.font = '22px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.font = '22px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       const tw2d = ctx.measureText(creditText2d).width;
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(6, H - 28, tw2d + 12, 24);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(creditText2d, 12, H - 6);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(6, H - 28, tw2d + 12, 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(creditText2d, 12, H - 6);
       imgDataUrl = cv.toDataURL('image/png');
     }
 
@@ -1683,6 +1832,7 @@ document.getElementById('btn-export-pdf').onclick = async () => {
     pdf.text(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'  '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'), mg, y); y+=6;
     pdf.setDrawColor(59,130,246); pdf.setLineWidth(0.3); pdf.line(mg,y,mg+leftW,y); y+=6;
 
+    // --- フライト統計（HTMLサイドバーと同じ4項目） ---
     const maxAltV = Math.max(...allPts.map(p=>p.alt));
     let dist=0; for(let i=1;i<allPts.length;i++) dist+=haversine(allPts[i-1],allPts[i]);
     const t0=allPts[0], t1=allPts[allPts.length-1];
@@ -1694,10 +1844,10 @@ document.getElementById('btn-export-pdf').onclick = async () => {
       ['Max Altitude', maxAltV.toFixed(1)+' m'],
       ['Total Distance', dist>=1000?(dist/1000).toFixed(2)+' km':Math.round(dist)+' m'],
       ['Data Points', allPts.length.toLocaleString()+' pt'],
-      ...(document.getElementById('pdf-hide-datetime').checked ? [] : [
-        ['Start', t0.ts.replace('T',' ').substring(0,19)],
-        ['End',   t1.ts.replace('T',' ').substring(0,19)],
-      ]),
+         ...(document.getElementById('pdf-hide-datetime').checked ? [] : [
+           ['Start', t0.ts.replace('T',' ').substring(0,19)],
+           ['End',   t1.ts.replace('T',' ').substring(0,19)],
+     ]),
     ];
     stats.forEach(([lbl,val])=>{
       pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(100,116,139); pdf.text(lbl,mg,y);
@@ -1705,6 +1855,7 @@ document.getElementById('btn-export-pdf').onclick = async () => {
     });
     y+=2; pdf.setDrawColor(200,210,225); pdf.setLineWidth(0.2); pdf.line(mg,y,mg+leftW,y); y+=5;
 
+    // --- ファイル一覧 ---
     pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(30,64,175); pdf.text('SRT FILES',mg,y); y+=4;
     files.forEach(f=>{
       if(y>PH-mg-12) return;
@@ -1712,14 +1863,17 @@ document.getElementById('btn-export-pdf').onclick = async () => {
       pdf.setFillColor(Math.round(rgb.r*255),Math.round(rgb.g*255),Math.round(rgb.b*255)); pdf.rect(mg,y-2.5,2.5,2.5,'F');
       pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(15,23,42);
       const displayName = document.getElementById('pdf-hide-datetime').checked
-        ? f.name.replace(/\d{14}/, '**************') : f.name;
+        ? f.name.replace(/\d{14}/, '**************')
+        : f.name;
       pdf.text((displayName.length>30?displayName.substring(0,27)+'...':displayName), mg+4, y);
       const d2=(new Date(f.frames[f.frames.length-1].ts)-new Date(f.frames[0].ts))/1000;
       const fm=Math.floor(d2/60),fs=Math.floor(d2%60);
+      const fDur=fm>0?fm+'m '+fs+'s ':fs+'s ';
       pdf.setTextColor(100,116,139);
-      pdf.text((fm>0?fm+'m '+fs+'s ':fs+'s ')+'  Max:'+Math.max(...f.frames.map(p=>p.alt)).toFixed(0)+'m  '+f.frames.length+'pt', mg+4, y+3.5); y+=9;
+      pdf.text(fDur+'  Max:'+Math.max(...f.frames.map(p=>p.alt)).toFixed(0)+'m  '+f.frames.length+'pt', mg+4, y+3.5); y+=9;
     });
 
+    // --- 離着陸ポイント ---
     if(y<PH-mg-28){
       y+=2; pdf.setDrawColor(200,210,225); pdf.setLineWidth(0.2); pdf.line(mg,y,mg+leftW,y); y+=5;
       pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(30,64,175); pdf.text('WAYPOINTS',mg,y); y+=4;
@@ -1741,7 +1895,9 @@ document.getElementById('btn-export-pdf').onclick = async () => {
       const asp=props.height/props.width;
       const dH=Math.min(rightW*asp, PH-mg*2), dW=dH/asp;
       const dX=rightX+(rightW-dW)/2, dY=mg+(PH-mg*2-dH)/2;
-      pdf.setFillColor(255,255,255); pdf.rect(rightX, mg, rightW, PH-mg*2, 'F');
+      // 地図エリアの余白を白で塗りつぶし
+      pdf.setFillColor(255,255,255);
+      pdf.rect(rightX, mg, rightW, PH-mg*2, 'F');
       pdf.setDrawColor(150,180,220); pdf.setLineWidth(0.4); pdf.rect(dX-0.5,dY-0.5,dW+1,dH+1);
       pdf.addImage(imgDataUrl,'PNG',dX,dY,dW,dH);
       pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
@@ -1758,7 +1914,7 @@ document.getElementById('btn-export-pdf').onclick = async () => {
   }
 };
 
-// リサイズ
+// リサイズ対応
 window.addEventListener('resize', () => {
   if (renderer3d && camera3d) {
     const W = document.getElementById('view-3d').clientWidth;
@@ -1769,20 +1925,23 @@ window.addEventListener('resize', () => {
   }
   if (leafletMap) leafletMap.invalidateSize();
 });
-
 document.getElementById('map-credit').textContent = TILE_LAYERS[currentLayer].credit;
 document.getElementById('pdf-hide-datetime').onchange = function() {
   if (this.checked) {
+    // 日時非表示：日付フィルターリセット・全ファイル非表示
     document.getElementById('filter-date-from').value = '';
     document.getElementById('filter-date-to').value = '';
+    // allFiles.forEach(f => f.visible = false);
   } else {
+    // 日時表示に戻す：日付を全期間に戻す
     const dates = allFiles.map(f => f._date).sort();
     if (dates.length) {
       document.getElementById('filter-date-from').value = dates[0];
       document.getElementById('filter-date-to').value = dates[dates.length - 1];
     }
   }
-  applyFilter(); updateWaypoints();
+  applyFilter();
+  updateWaypoints();
 };
 loadSettings();
 </script>
@@ -1833,6 +1992,7 @@ loadSettings();
 </div>
 
 <script>
+  // 言語切り替え
   function setLang(lang) {
     document.getElementById('about-ja').style.display = lang === 'ja' ? 'block' : 'none';
     document.getElementById('about-en').style.display = lang === 'en' ? 'block' : 'none';
@@ -1856,6 +2016,7 @@ loadSettings();
     if (e.target === e.currentTarget) closeAbout();
   };
 
+  // 初回のみ自動表示
   if (!localStorage.getItem('fpv_license_shown')) openAbout();
 </script>
 
