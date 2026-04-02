@@ -379,17 +379,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       <div id="leaflet-map"></div>
     </div>
 
-    <!-- 横並びにする親 -->
-    <div style="display:flex; gap:8px; align-items:center;">
-      <!-- ビュー切り替え -->
-      <div id="view-toggle" style="display:flex; gap:4px;">
-        <div class="vtab active" data-view="3d">3D</div>
-        <div class="vtab" data-view="2d">2D</div>
-      </div>
-
-      <!-- 視点リセット -->
-      <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button>
+    <!-- ビュー切り替え -->
+    <div id="view-toggle" style="display:flex; gap:4px;">
+      <div class="vtab active" data-view="3d">3D</div>
+      <div class="vtab" data-view="2d">2D</div>
     </div>
+
+    <!-- 視点リセット -->
+    <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button>
 
     <!-- コンパス -->
     <div id="compass">
