@@ -389,17 +389,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
       <div id="leaflet-map"></div>
     </div>
 
-    <!-- ビュー切り替え -->
-    <div id="view-toggle" style="display:flex; gap:4px;">
-      <div class="vtab active" data-view="3d">3D</div>
-      <div class="vtab" data-view="2d">2D</div>
-    </div>
-
-    <!-- モバイル用オーバーレイボタン -->
-    <div id="mobile-overlay-buttons">
+    <!-- 横並びの親 -->
+    <div id="toolbar" style="display:flex; gap:8px; align-items:center;">
+      <!-- ビュー切り替え -->
+      <div id="view-toggle" style="display:flex; gap:4px;">
+        <div class="vtab active" data-view="3d">3D</div>
+        <div class="vtab" data-view="2d">2D</div>
+      </div>
+      <!-- ビュー切り替え -->
       <button class="btn btn-ghost btn-sm" id="btn-reset-view-m">リセット</button>
-      <!-- <button class="btn btn-ghost btn-sm" id="btn-export-pdf-m" style="border-color:rgba(34,211,238,0.4);color:var(--accent2);">📄 PDF</button>
-      <button class="btn btn-ghost btn-sm" id="btn-about-m" style="border-color:rgba(100,160,255,0.3);">ℹ️</button> -->
     </div>
 
     <!-- コンパス -->
