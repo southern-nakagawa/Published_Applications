@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIT rise One Tools</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: #f4f6f9;
+  color: #1a1a2e;
+  min-height: 100vh;
+}
+header {
+  background: #0f2d5c;
+  padding: 20px 40px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 {
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+header p {
+  color: #4da6ff;
+  font-size: 13px;
+  margin-top: 2px;
+}
+main {
+  max-width: 900px;
+  margin: 60px auto;
+  padding: 0 24px;
+}
+h2 {
+  font-size: 15px;
+  color: #5a7a9a;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 28px 24px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid #e0e8f0;
+  transition: box-shadow 0.2s, transform 0.2s;
+  display: block;
+}
+.card:hover {
+  box-shadow: 0 4px 20px rgba(15,45,92,0.12);
+  transform: translateY(-2px);
+}
+.card-icon {
+  width: 48px;
+  height: 48px;
+  background: #0f2d5c;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.card-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #0f2d5c;
+}
+.card p {
+  font-size: 13px;
+  color: #5a7a9a;
+  line-height: 1.6;
+}
+.tag {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 4px 10px;
+  background: #e6f0fb;
+  color: #1a5fad;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+footer {
+  text-align: center;
+  padding: 40px;
+  color: #9aa8b8;
+  font-size: 12px;
+}
+footer a {
+  color: #1a5fad;
+  text-decoration: none;
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>BIT rise One Tools</h1>
+    <p>AIで生成したツール一覧</p>
+  </div>
+</header>
+
+<main>
+  <h2>公開中のツール</h2>
+  <div class="grid">
+    <!-- テスト用 -->
+    <a class="card" href="file:///Users/hideyuki/Documents/Web-Project/Published_Applications/Flight_Path_Visualizer/index.html">
+    <!-- 本番用 -->
+    <!-- <a class="card" href="./Flight_Path_Visualizer/"> -->
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4da6ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L8 8H3l4 4-1.5 6L12 15l6.5 3L17 12l4-4h-5z"/>
+        </svg>
+      </div>
+      <h3>Flight Path Visualizer</h3>
+      <p>ドローンの飛行軌跡をSRTデータから3Dマップ上に可視化するツールです。</p>
+      <span class="tag">Web App</span>
+    </a>
+  </div>
+</main>
+
+<footer>
+  <a href="https://bitriseone.com">bitriseone.com</a> &nbsp;|&nbsp; 社外ITサポーター
+</footer>
+</body>
+</html>
