@@ -887,7 +887,7 @@ function initOffscreenMap() {
     zoomAnimation: false,
   });
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
-      maxZoom: 18,
+      maxZoom: 24,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   offscreenLayer.addTo(offscreenMap);
@@ -897,7 +897,7 @@ function updateOffscreenLayer() {
   if (!offscreenMap) return;
   if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
-      maxZoom: 18,
+      maxZoom: 24,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   offscreenLayer.addTo(offscreenMap);
@@ -1471,7 +1471,7 @@ function switchTileLayer(key) {
   const tl = TILE_LAYERS[key];
   leafletLayerObj = L.tileLayer(tl.url, {
       attribution: tl.attr,
-      maxZoom: 18,
+      maxZoom: 24,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   leafletLayerObj.addTo(leafletMap);
