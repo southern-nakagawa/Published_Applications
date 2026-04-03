@@ -887,7 +887,7 @@ function initOffscreenMap() {
     zoomAnimation: false,
   });
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
-      maxZoom: 20,
+      maxZoom: 18,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   offscreenLayer.addTo(offscreenMap);
@@ -897,7 +897,7 @@ function updateOffscreenLayer() {
   if (!offscreenMap) return;
   if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
-      maxZoom: 20,
+      maxZoom: 18,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   offscreenLayer.addTo(offscreenMap);
@@ -1471,7 +1471,7 @@ function switchTileLayer(key) {
   const tl = TILE_LAYERS[key];
   leafletLayerObj = L.tileLayer(tl.url, {
       attribution: tl.attr,
-      maxZoom: 20,
+      maxZoom: 18,
       crossOrigin: 'anonymous'   // ← これを追加
   });
   leafletLayerObj.addTo(leafletMap);
@@ -1533,7 +1533,10 @@ function update2D() {
   });
 
   const allLatLons = allPts.map(p => [p.lat, p.lon]);
-  if (allLatLons.length) leafletMap.fitBounds(L.latLngBounds(allLatLons), { padding: [40, 40] });
+  if (allLatLons.length) {
+    leafletMap.fitBounds(L.latLngBounds(allLatLons), { padding: [40, 40] });
+    setTimeout(() => leafletMap.zoomIn(2), 300); // 2段階拡大（1〜3で調整）
+  }
 }
 
 // ===== ビュー切り替え =====
