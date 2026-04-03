@@ -882,8 +882,19 @@ const isLocal = location.protocol === 'file:';
 function initOffscreenMap() {
   if (offscreenMap) return;
   offscreenMap = L.map('offscreen-leaflet', {
+<<<<<<< HEAD
     zoomControl: false, attributionControl: false,
     fadeAnimation: false, zoomAnimation: false,
+=======
+    zoomControl: false,
+    attributionControl: false,
+    fadeAnimation: false,
+    zoomAnimation: false,
+  });
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+>>>>>>> parent of f1a3e4a (Update index.html)
   });
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
   offscreenLayer.addTo(offscreenMap);
@@ -892,7 +903,14 @@ function initOffscreenMap() {
 function updateOffscreenLayer() {
   if (!offscreenMap) return;
   if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
+<<<<<<< HEAD
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
+=======
+  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
+      maxZoom: 18,
+      crossOrigin: 'anonymous'   // ← これを追加
+  });
+>>>>>>> parent of f1a3e4a (Update index.html)
   offscreenLayer.addTo(offscreenMap);
 }
 
@@ -1464,7 +1482,11 @@ function switchTileLayer(key) {
   const tl = TILE_LAYERS[key];
   leafletLayerObj = L.tileLayer(tl.url, {
       attribution: tl.attr,
+<<<<<<< HEAD
       maxZoom: 22,
+=======
+      maxZoom: 18,
+>>>>>>> parent of f1a3e4a (Update index.html)
       crossOrigin: 'anonymous'   // ← これを追加
   });
   leafletLayerObj.addTo(leafletMap);
