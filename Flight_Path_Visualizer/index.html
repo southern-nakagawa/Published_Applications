@@ -214,7 +214,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
     Flight Path Visualizer
   </h1>
   <div style="display:flex;gap:8px;">
-    <button class="btn btn-ghost btn-sm" id="btn-reset-view">視点リセット</button>
     <button class="btn btn-ghost btn-sm" id="btn-export-pdf" style="border-color:rgba(34,211,238,0.4);color:var(--accent2);">📄 PDF出力</button>
     <button class="btn btn-ghost btn-sm" id="btn-about" style="border-color:rgba(100,160,255,0.3);">ℹ️</button>
   </div>
@@ -378,10 +377,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
     <div id="view-map">
       <div id="leaflet-map"></div>
     </div>
+
     <!-- ビュー切り替え -->
     <div id="view-toggle">
-      <div class="vtab active" data-view="3d">3D</div>
-      <div class="vtab" data-view="2d">2D 地図</div>
+      <div class="vtab active" data-view="3d">3D VIEW</div>
+      <div class="vtab" data-view="2d">2D VIEW</div>
+      <div class="vtab" id="btn-reset-view" style="color:var(--text2);">リセット</div>
     </div>
 
     <!-- コンパス -->
@@ -877,15 +878,9 @@ const TILE_LAYERS = {
   'gsi-photo':{ url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', attr: '© 国土地理院',               credit: '地理院タイル（航空写真）を加工して掲載（国土地理院）' },
 };
 
-const isLocal = location.protocol === 'file:';
-
 function initOffscreenMap() {
   if (offscreenMap) return;
   offscreenMap = L.map('offscreen-leaflet', {
-<<<<<<< HEAD
-    zoomControl: false, attributionControl: false,
-    fadeAnimation: false, zoomAnimation: false,
-=======
     zoomControl: false,
     attributionControl: false,
     fadeAnimation: false,
@@ -894,23 +889,17 @@ function initOffscreenMap() {
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
       maxZoom: 18,
       crossOrigin: 'anonymous'   // ← これを追加
->>>>>>> parent of f1a3e4a (Update index.html)
   });
-  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
   offscreenLayer.addTo(offscreenMap);
 }
 
 function updateOffscreenLayer() {
   if (!offscreenMap) return;
   if (offscreenLayer) offscreenMap.removeLayer(offscreenLayer);
-<<<<<<< HEAD
-  offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, { maxZoom: 18, crossOrigin: 'anonymous' });
-=======
   offscreenLayer = L.tileLayer(TILE_LAYERS[currentLayer].url, {
       maxZoom: 18,
       crossOrigin: 'anonymous'   // ← これを追加
   });
->>>>>>> parent of f1a3e4a (Update index.html)
   offscreenLayer.addTo(offscreenMap);
 }
 
@@ -1473,7 +1462,7 @@ let leafletMarkers = [];
 
 function initLeaflet() {
   if (leafletMap) return;
-  leafletMap = L.map('leaflet-map', { zoomControl: false, attributionControl: false, maxZoom: 22 });  // ズームコントロール無効化
+  leafletMap = L.map('leaflet-map', { zoomControl: false, attributionControl: false });  // ズームコントロール無効化
   switchTileLayer(currentLayer);
 }
 
@@ -1482,15 +1471,7 @@ function switchTileLayer(key) {
   const tl = TILE_LAYERS[key];
   leafletLayerObj = L.tileLayer(tl.url, {
       attribution: tl.attr,
-<<<<<<< HEAD
-<<<<<<< HEAD
-      maxZoom: 22,
-=======
       maxZoom: 18,
->>>>>>> parent of f1a3e4a (Update index.html)
-=======
-      maxZoom: 18,
->>>>>>> parent of f1a3e4a (Update index.html)
       crossOrigin: 'anonymous'   // ← これを追加
   });
   leafletLayerObj.addTo(leafletMap);
@@ -1550,13 +1531,9 @@ function update2D() {
       leafletMarkers.push(m);
     });
   });
+
   const allLatLons = allPts.map(p => [p.lat, p.lon]);
-  if (allLatLons.length) {
-    leafletMap.fitBounds(L.latLngBounds(allLatLons), { padding: [40, 40] });
-    setTimeout(() => {
-      leafletMap.setZoom(20); // 固定ズームレベルで指定
-    }, 400);
-  }
+  if (allLatLons.length) leafletMap.fitBounds(L.latLngBounds(allLatLons), { padding: [40, 40] });
 }
 
 // ===== ビュー切り替え =====
@@ -1574,8 +1551,20 @@ document.querySelectorAll('.vtab').forEach(tab => {
       if (!leafletMap) initLeaflet();
       update2D();
       setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 150);
+      // 2Dは常に北が上なのでコンパス針をリセット
       const needle = document.getElementById('compass-needle');
       if (needle) needle.setAttribute('transform', 'rotate(0,18,18)');
+    } else {
+      // 3Dに戻った時にリサイズ強制
+      setTimeout(() => {
+        if (renderer3d && camera3d) {
+          const el = document.getElementById('view-3d');
+          const W = el.clientWidth, H = el.clientHeight;
+          renderer3d.setSize(W, H);
+          camera3d.aspect = W / H;
+          camera3d.updateProjectionMatrix();
+        }
+      }, 50);
     }
   };
 });
