@@ -932,8 +932,8 @@ function buildMapTextureAndRender3D() {
   const latSpan = maxLat - minLat;
   const lonSpan = maxLon - minLon;
   const minMargin = 0.005; // 最小550m四方
-  const dLat = Math.max(latSpan * 1.00, minMargin);
-  const dLon = Math.max(lonSpan * 1.00, minMargin);
+  const dLat = Math.max(latSpan * 0.50, minMargin);
+  const dLon = Math.max(lonSpan * 0.50, minMargin);
 
   const bMinLat = minLat - dLat, bMaxLat = maxLat + dLat;
   const bMinLon = minLon - dLon, bMaxLon = maxLon + dLon;
