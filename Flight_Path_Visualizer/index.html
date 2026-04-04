@@ -684,16 +684,27 @@ async function fetchLocName(key, lat, lon) {
   } catch(e) { locNameCache[key] = key; return key; }
 }
 
-// locKeyの配列を現在地に近い順で返す
+// locKeyの配列を最新日のフライトがある場所グループ
 function getSortedLocKeys() {
   const keys = [...new Set(allFiles.map(f => f._locKey))];
-  if (userLat !== null) {
-    keys.sort((a, b) => {
+
+  // 各locKeyグループの最新_dateを求める
+  const latestDateOf = key =>
+    allFiles.filter(f => f._locKey === key)
+            .reduce((max, f) => f._date > max ? f._date : max, '');
+
+  keys.sort((a, b) => {
+    const da = latestDateOf(a), db = latestDateOf(b);
+    if (db !== da) return db > da ? 1 : -1; // 最新日が新しい順（降順）
+    // 同日の場合は現在地に近い順
+    if (userLat !== null) {
       const [aLat, aLon] = a.split(',').map(Number);
       const [bLat, bLon] = b.split(',').map(Number);
       return geoDistance(userLat, userLon, aLat, aLon) - geoDistance(userLat, userLon, bLat, bLon);
-    });
-  }
+    }
+    return 0;
+  });
+
   return keys;
 }
 
