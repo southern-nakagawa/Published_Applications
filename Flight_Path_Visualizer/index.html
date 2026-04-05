@@ -247,7 +247,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
 
     <!-- フライト一覧 -->
     <div class="side-section" id="flight-list-section" style="display:none">
-      <h3>フライト一覧</h3>
+      <h3 style="display:flex;align-items:center;justify-content:space-between;">
+        フライト一覧
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;font-weight:normal;letter-spacing:0;">
+          <input type="checkbox" id="pdf-hide-datetime"> 日時を非表示
+        </label>
+      </h3>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px;">
         <!-- 場所プルダウン -->
         <div style="display:flex;gap:4px;align-items:center;">
@@ -295,12 +300,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', s
     </div>
 
     <div class="side-section">
-      <h3 style="display:flex;align-items:center;justify-content:space-between;">
-        表示設定
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;">
-          <input type="checkbox" id="pdf-hide-datetime"> 日時を非表示
-        </label>
-      </h3>
+      <h3>表示設定</h3>
       <div style="margin-bottom:10px;">
         <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">経路カラーモード</div>
         <div style="display:flex;gap:6px;">
@@ -557,7 +557,7 @@ function recomputeAll() {
   updateLegend();
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('stats-section').style.display = 'block';
-  document.getElementById('waypoints-section').style.display = 'block';
+  document.getElementById('waypoints-section').style.display = 'none';
   document.getElementById('legend').style.display = 'block';
 }
 
@@ -800,17 +800,30 @@ function renderFlightTable(list) {
     // 日時表示時はフル表示（CSS省略+ホバー）、非表示時はマスク名そのまま
     const displayName = maskedName;
     const distStr = f._dist >= 1000 ? (f._dist/1000).toFixed(1)+'km' : Math.round(f._dist)+'m';
+    const dateTimeStr = hideDT
+      ? '****-**-** **:**'
+      : f.frames[0].ts.substring(0, 16).replace('T', ' ');
     const div = document.createElement('div');
     div.style.cssText = `display:flex;align-items:flex-start;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);`;
+
+    const evHtml = (f.events || []).map(ev => {
+      const icon  = ev.type === 'takeoff' ? '🟢' : '🔴';
+      const label = ev.type === 'takeoff' ? '離陸' : '着陸';
+      return `<span style="display:inline-flex;align-items:center;gap:2px;margin-right:6px;">
+        ${icon}<span style="color:var(--text2);">${label}</span>
+        <span style="color:var(--text);">${ev.frame.lat.toFixed(5)},${ev.frame.lon.toFixed(5)} ${ev.frame.alt.toFixed(1)}m</span>
+      </span>`;
+    }).join('<br>');
+
     div.innerHTML = `
       <input type="checkbox" data-id="${f.id}" ${f.visible ? 'checked' : ''} style="margin-top:3px;accent-color:var(--accent);flex-shrink:0;">
       <div style="width:8px;height:8px;border-radius:50%;background:${f.color};flex-shrink:0;margin-top:4px;"></div>
       <div style="min-width:0;flex:1;">
         <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${displayName}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px;">
-          📅 ${f._date} &nbsp;⏱ ${fmtDur(Math.round(f._dur))}<br>
-          ↑ ${f._maxAlt.toFixed(0)}m &nbsp; 🛤 ${distStr} &nbsp; 📍 ${f._locKey}
+          📅 ${dateTimeStr} &nbsp;⏱ ${fmtDur(Math.round(f._dur))} &nbsp;↑ ${f._maxAlt.toFixed(0)}m &nbsp;🛤 ${distStr}
         </div>
+        <div style="font-size:10px;margin-top:2px;line-height:1.7;">${evHtml}</div>
       </div>`;
     div.querySelector('input').onchange = e => {
       const target = allFiles.find(a => String(a.id) === e.target.dataset.id);
@@ -931,9 +944,9 @@ function buildMapTextureAndRender3D() {
   // マージン25%（飛行スパンの1.5倍の地図範囲）
   const latSpan = maxLat - minLat;
   const lonSpan = maxLon - minLon;
-  const minMargin = 0.005; // 最小550m四方
-  const dLat = Math.max(latSpan * 0.50, minMargin);
-  const dLon = Math.max(lonSpan * 0.50, minMargin);
+  const minMargin = 0.001; // 現在。度単位で約110m
+  const dLat = Math.max(latSpan * 0.25, minMargin); //飛行範囲の50%余白
+  const dLon = Math.max(lonSpan * 0.25, minMargin); //飛行範囲の50%余白
 
   const bMinLat = minLat - dLat, bMaxLat = maxLat + dLat;
   const bMinLon = minLon - dLon, bMaxLon = maxLon + dLon;
